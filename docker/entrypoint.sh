@@ -32,6 +32,15 @@ if [ -n "${OPENSURGE_ALLOWED_HOSTS:-}" ]; then
 	ALLOWED_HOSTS_ARGS="--allowed-hosts=${OPENSURGE_ALLOWED_HOSTS}"
 fi
 
+# NAS sidecar: restore the bypass gateway after container/host reboot unless
+# the last GUI action was an explicit stop. Set OPENSURGE_GATEWAY_AUTOSTART=0
+# to keep only the control plane.
+AUTOSTART_ARGS=""
+case "${OPENSURGE_GATEWAY_AUTOSTART:-1}" in
+	0|false|FALSE|no|NO|off|OFF) ;;
+	*) AUTOSTART_ARGS="--autostart-gateway" ;;
+esac
+
 mkdir -p "$STORE"
 
 # Docker 默认把 /proc/sys 挂成只读，网关启动时要写 net.ipv4.ip_forward 会失败。
@@ -51,6 +60,7 @@ fi
 
 # 容器被停掉时把网关也拆干净：mihomo / dnsmasq 进程、nftables 表、ip_forward 都要还原，
 # 否则下次启动会撞上残留的 state.json 和 nft 表。
+# 这里走 `omg stop` CLI，不会改 GUI 记下的启停意图；NAS 重启后仍按意图自动恢复。
 shutdown() {
 	echo "收到停止信号，正在停止网关…"
 	omg stop --config "$CONFIG" || true
@@ -70,7 +80,7 @@ echo "若需一次性 bootstrap 链接：scripts/fnos-gui-url.sh"
 
 # shellcheck disable=SC2086
 opensurge-control --direct-root --config "$CONFIG" --addr "$ADDR" \
-	--base-url "$OPENSURGE_BASE_URL" --store "$STORE" ${ALLOWED_HOSTS_ARGS} &
+	--base-url "$OPENSURGE_BASE_URL" --store "$STORE" ${ALLOWED_HOSTS_ARGS} ${AUTOSTART_ARGS} &
 control_pid=$!
 
 # wait 会被信号打断，所以要循环等到子进程真的退出。

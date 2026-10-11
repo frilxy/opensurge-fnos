@@ -87,10 +87,18 @@ fi
 
 echo "== 6. nftables / ip_forward =="
 if [ "$START_GATEWAY" = true ]; then
-	if docker exec "$CONTAINER" omg start --config "$CONFIG"; then
+	if docker exec "$CONTAINER" nft list tables 2>/dev/null | grep -q 'inet opensurge'; then
+		pass "网关已在运行（autostart）"
+	elif docker exec "$CONTAINER" omg start --config "$CONFIG"; then
 		pass "omg start 成功"
 	else
-		fail "omg start 失败，看 docker logs"
+		# reboot leftover: state.json is interrupted until stop
+		docker exec "$CONTAINER" omg stop --config "$CONFIG" || true
+		if docker exec "$CONTAINER" omg start --config "$CONFIG"; then
+			pass "omg start 成功（先清理 interrupted runtime）"
+		else
+			fail "omg start 失败，看 docker logs"
+		fi
 	fi
 fi
 if docker exec "$CONTAINER" nft list tables 2>/dev/null | grep -q 'inet opensurge'; then

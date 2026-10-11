@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -55,6 +56,10 @@ type Options struct {
 	Static            http.Handler
 	Credentials       SourceCredentialStore
 	RevealInFinder    func(context.Context, string) error
+	// AutostartGateway restores the gateway when the control plane starts.
+	// Docker/fnOS sidecars enable this so a NAS reboot does not leave the
+	// bypass gateway stopped behind a live Web GUI.
+	AutostartGateway bool
 }
 
 type Server struct {
@@ -95,6 +100,7 @@ type Server struct {
 	token                 string
 	baseURL               string
 	allowedHosts          map[string]struct{}
+	autostartGateway      bool
 
 	mu          sync.Mutex
 	lifecycleMu sync.Mutex
@@ -265,14 +271,15 @@ func New(options Options) (*Server, error) {
 		gatewayStatus: func(ctx context.Context, cfg config.Config) (gateway.Status, error) {
 			return gateway.New(cfg).Status(ctx)
 		},
-		doctor:          newDoctorController(doctor.Run),
-		mihomoRecovery:  newMihomoRecoveryController(),
-		sleepPrevention: newSleepPreventionController(options.SleepRunner, configPath),
-		token:           token,
-		baseURL:         baseURL,
-		allowedHosts:    allowedHosts,
-		sessions:        map[string]time.Time{},
-		bootstraps:      map[string]bootstrapGrant{},
+		doctor:           newDoctorController(doctor.Run),
+		mihomoRecovery:   newMihomoRecoveryController(),
+		sleepPrevention:  newSleepPreventionController(options.SleepRunner, configPath),
+		token:            token,
+		baseURL:          baseURL,
+		allowedHosts:     allowedHosts,
+		autostartGateway: options.AutostartGateway,
+		sessions:         map[string]time.Time{},
+		bootstraps:       map[string]bootstrapGrant{},
 	}, nil
 }
 
@@ -466,6 +473,9 @@ func (s *Server) Serve(ctx context.Context) error {
 	defer s.sleepPrevention.Close()
 	defer s.policyWorkspaceLease.Close()
 	httpServer := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
+	if s.autostartGateway {
+		go s.restoreGatewayIfDesired()
+	}
 	go s.monitorMihomoRecovery(ctx)
 	go func() {
 		<-ctx.Done()
@@ -1048,6 +1058,16 @@ func (s *Server) handleGatewayAction(w http.ResponseWriter, r *http.Request) {
 	if action == "restart-mihomo" {
 		s.mihomoRecovery.beginManual()
 	}
+	switch action {
+	case "start":
+		if err := s.store.SaveGatewayDesired(true); err != nil {
+			log.Printf("OpenSurge persist gateway desired running: %v", err)
+		}
+	case "stop":
+		if err := s.store.SaveGatewayDesired(false); err != nil {
+			log.Printf("OpenSurge persist gateway desired stopped: %v", err)
+		}
+	}
 	locked = false
 	go s.runOperationLocked(op, cfg.Gateway.Mode, recovery, startWorkspace, nil)
 	writeJSON(w, http.StatusAccepted, op)
@@ -1055,6 +1075,10 @@ func (s *Server) handleGatewayAction(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) runOperationLocked(op Operation, topology string, recoveryBefore RecoveryState, startWorkspace *PolicyWorkspaceInput, completed func(error)) {
 	defer s.lifecycleMu.Unlock()
+	s.runOperation(op, topology, recoveryBefore, startWorkspace, completed)
+}
+
+func (s *Server) runOperation(op Operation, topology string, recoveryBefore RecoveryState, startWorkspace *PolicyWorkspaceInput, completed func(error)) {
 	ctx, cancel := context.WithTimeout(context.Background(), gatewayOperationTimeout)
 	defer cancel()
 	ctx = s.observeOperation(ctx, &op)

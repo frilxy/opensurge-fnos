@@ -130,6 +130,36 @@ func (s *Store) SaveTailscaleDiscovery(discovery TailscaleDiscoveryResponse, sav
 	return writeAtomic(filepath.Join(s.dir, "tailscale-discovery.json"), append(data, '\n'), 0o600)
 }
 
+type gatewayDesiredState struct {
+	SchemaVersion int  `json:"schema_version"`
+	Running       bool `json:"running"`
+}
+
+func (s *Store) GatewayDesired() (running bool, exists bool, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var state gatewayDesiredState
+	err = readJSON(filepath.Join(s.dir, "gateway-desired.json"), &state)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, false, nil
+	}
+	if err != nil {
+		return false, false, err
+	}
+	return state.Running, true, nil
+}
+
+func (s *Store) SaveGatewayDesired(running bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := gatewayDesiredState{SchemaVersion: SchemaVersion, Running: running}
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writeAtomic(filepath.Join(s.dir, "gateway-desired.json"), append(data, '\n'), 0o600)
+}
+
 func (s *Store) Recovery() (RecoveryState, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

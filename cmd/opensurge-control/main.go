@@ -21,6 +21,7 @@ func main() {
 	storeDir := flag.String("store", "", "application support directory")
 	helperSocket := flag.String("helper-socket", "/var/run/opensurge/helper.sock", "privileged helper socket")
 	direct := flag.Bool("direct-root", false, "run actions directly; requires root and is intended for development")
+	autostartGateway := flag.Bool("autostart-gateway", false, "restore the bypass gateway when the control plane starts (Docker/fnOS sidecar)")
 	flag.Parse()
 
 	runner := controlapi.ActionRunner(controlapi.HelperClient{SocketPath: *helperSocket})
@@ -35,13 +36,14 @@ func main() {
 		}
 	}
 	server, err := controlapi.New(controlapi.Options{
-		ConfigPath: *configPath,
-		Addr:       *addr,
-		BaseURL:    *baseURL,
-		ExtraHosts: extraHosts,
-		StoreDir:   *storeDir,
-		Runner:     runner,
-		Static:     webui.Handler(),
+		ConfigPath:       *configPath,
+		Addr:             *addr,
+		BaseURL:          *baseURL,
+		ExtraHosts:       extraHosts,
+		StoreDir:         *storeDir,
+		Runner:           runner,
+		Static:           webui.Handler(),
+		AutostartGateway: *autostartGateway,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -26,4 +26,6 @@ services:
       # 额外允许的 Host（逗号分隔）：DDNS 域名、反代主机名、备用 LAN IP。
       # 例：opensurge.example.com,nas.local
       OPENSURGE_ALLOWED_HOSTS: ${OPENSURGE_ALLOWED_HOSTS:-}
+      # 容器/NAS 重启后自动恢复旁路由。GUI 里主动停止后保持停止。0/false 关闭。
+      OPENSURGE_GATEWAY_AUTOSTART: ${OPENSURGE_GATEWAY_AUTOSTART:-1}
     restart: unless-stopped

@@ -240,6 +240,18 @@ OPENSURGE_BASE_URL=https://opensurge.example.com
 
 停止时应走正常 stop（会清理网关状态）；避免 `docker kill`，以免留下 nft 表或 `ip_forward`。
 
+### 6.1.1 NAS / 容器重启后旁路由会自动恢复
+
+这不是飞牛系统限制。控制面容器会随 Docker `restart: unless-stopped` 起来，但旁路由（mihomo + nftables + TUN）以前要在 Web GUI 再点一次启动——重启后 `state.json` 属于上一次 boot，状态是 interrupted，必须先停再开。
+
+现在控制面默认会：
+
+1. 记住 GUI 里最后一次 **启动 / 停止** 意图（`state/store/gateway-desired.json`）
+2. 容器起来后，若意图是运行（或还没有记录过意图），先清理残留 runtime，再自动 `start`
+3. 若你在 GUI 里**主动停止**了网关，重启后保持停止
+
+关闭自动恢复：给容器环境变量 `OPENSURGE_GATEWAY_AUTOSTART=0`。长期不用请停应用/容器，不要只关 GUI。
+
 ### 6.2 Web GUI 功能概览
 
 | 页面 | 用途 |
@@ -347,7 +359,14 @@ docker logs opensurge --tail 100
 - 无 `SYS_ADMIN` 且宿主 `ip_forward=0`  
 - 镜像未拉取成功  
 
-### 9.3 网关启不来 / 无流量
+### 9.3 NAS 重启后旁路由没自动起来
+
+1. `docker logs opensurge --tail 80` 里应有 `OpenSurge gateway autostart`
+2. 确认环境变量 `OPENSURGE_GATEWAY_AUTOSTART` 不是 `0`
+3. 若上次在 GUI 点过停止，这是刻意保持停止——再在总览里启动一次
+4. 应用中心里 OpenSurge 是否在运行（容器本身也要起来）
+
+### 9.4 网关启不来 / 无流量
 
 ```bash
 docker exec opensurge omg doctor --config /etc/opensurge/config.yaml
@@ -359,7 +378,7 @@ ss -lnup | grep -E ':53|:61767'
 - TUN：确认设备映射 `/dev/net/tun`  
 - 客户端是否已把网关/DNS 指到 NAS  
 
-### 9.4 应用中心图标仍是旧的，但桌面已是新的
+### 9.5 应用中心图标仍是旧的，但桌面已是新的
 
 磁盘 `ICON.PNG` 已更新时，属于 **应用中心 UI 缓存**（飞牛已知现象）。  
 强刷 / 无痕 / 重新登录；必要时执行第 6 节图标修复命令。

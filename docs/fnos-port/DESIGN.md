@@ -346,6 +346,16 @@ services:
 - 顺带删掉了 `.github/workflows/release-unsigned.yml` 和
   `packaging/unsigned-release-notes.md`（macOS pkg 发布流水线，脚本删了就是死代码）。
 
+### 6. 重启后旁路由不会自己起来（issue #1，已修）
+
+Docker `restart: unless-stopped` 只保证 **控制面容器** 回来。`opensurge-control`
+以前不调用 `omg start`；volume 里的 `state.json` 带着上一次 `boot_id`，状态变成
+`interrupted`，GUI 的 Start 还会被 `gateway_already_running` 拦住，必须先 Stop。
+
+sidecar 默认 `--autostart-gateway`：记住 GUI 启停意图，控制面起来后若意图是运行，
+先清理残留 runtime 再 start。Mac 桌面不加这个 flag。容器 SIGTERM 时 entrypoint
+的 `omg stop` 只做清理，不改意图，所以 NAS 重启仍会恢复。
+
 ### 尚未验证的部分
 
 `nft` 对**宿主网络命名空间**的操作、以及 TUN 建立，在开发机（macOS + OrbStack）

@@ -29,6 +29,8 @@
 > | Port design | [DESIGN.md](docs/fnos-port/DESIGN.md) |
 >
 > Web GUI (LAN): `http://<NAS-IP>:61767/enter` — use `/enter` to establish a session.
+> After a NAS/container reboot the bypass gateway restores itself from the last
+> GUI start/stop intent; you do not need to press Start again.
 >
 > Everything below is largely upstream macOS documentation. **pkg installer, menu
 > bar app, launchd, pf, and networksetup do not apply here** — those artifacts

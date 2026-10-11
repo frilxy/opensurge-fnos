@@ -110,6 +110,15 @@ compose 需监听 `0.0.0.0`，且配置中 `gateway.lan_ip`（或环境变量
 > 上游默认只绑 loopback；本项目用可选 `BaseURL` 支持「控制面在 NAS、浏览器在
 > 另一台机器」。entrypoint 会从 `gateway.lan_ip` 自动推导 BaseURL。
 
+### 重启后自动恢复旁路由
+
+容器带 `restart: unless-stopped`，控制面会随 Docker 起来。旁路由默认也会自动恢复：
+entrypoint 给 `opensurge-control` 加上 `--autostart-gateway`（可用
+`OPENSURGE_GATEWAY_AUTOSTART=0` 关掉）。GUI 里主动停止后，重启保持停止。
+
+这不是 fnOS 限制。旧行为是只起控制面，网关 runtime 在 reboot 后变成 interrupted，
+必须在 GUI 先停再开。
+
 ## 五、设备侧
 
 在要走代理的设备上手动设置：
