@@ -1,0 +1,29 @@
+services:
+  opensurge:
+    image: ${OPENSURGE_IMAGE:-ghcr.io/funchs/opensurge-fnos:v0.1.1}
+    container_name: opensurge
+    # 旁路由必须走宿主网络：要看得见真实网卡、要能建 TUN、nftables 规则要作用在宿主上。
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      # 只为把 /proc/sys remount 成可写——Docker 默认挂只读，网关要写
+      # net.ipv4.ip_forward。host 网络下不能用 sysctls:，privileged 又太宽。
+      - SYS_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./config:/etc/opensurge
+      - ./state:/var/lib/opensurge
+    environment:
+      # 绑 0.0.0.0 只是让局域网连得上；签发会话仍要 state/store/control-token。
+      # 是 HTTP 明文，token 会裸奔，别暴露到公网。
+      OPENSURGE_ADDR: 0.0.0.0:61767
+      # 浏览器侧看到的地址，Origin 校验用。不填时只允许绑 loopback（上游行为），
+      # 从别的机器访问会被拦。留空则由 entrypoint 从 gateway.lan_ip 推导。
+      # 反代/域名访问可设为 https://opensurge.example.com
+      OPENSURGE_BASE_URL: ${OPENSURGE_BASE_URL:-}
+      # 额外允许的 Host（逗号分隔）：DDNS 域名、反代主机名、备用 LAN IP。
+      # 例：opensurge.example.com,nas.local
+      OPENSURGE_ALLOWED_HOSTS: ${OPENSURGE_ALLOWED_HOSTS:-}
+    restart: unless-stopped

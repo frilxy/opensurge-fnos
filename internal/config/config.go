@@ -155,6 +155,10 @@ type TransparentConfig struct {
 	TUNStack               string
 	TUNAutoRoute           bool
 	TUNAutoDetectInterface bool
+	// TUNAutoRedirect enables mihomo's Linux nft/iptables auto-redirect so
+	// forwarded LAN client traffic enters the TUN stack (side-router path).
+	// The renderer only emits it when true.
+	TUNAutoRedirect        bool
 	TUNStrictRoute         bool
 	TUNIPv6                string
 	IPv6SharedL2Ready      bool
@@ -271,7 +275,8 @@ func Default() Config {
 			TUNDevice:              "utun123",
 			TUNStack:               "mixed",
 			TUNAutoRoute:           true,
-			TUNAutoDetectInterface: false,
+			TUNAutoDetectInterface: defaultTUNAutoDetectInterface(),
+			TUNAutoRedirect:        defaultTUNAutoRedirect(),
 			TUNStrictRoute:         false,
 			TUNIPv6:                TUNIPv6Off,
 			IPv6SharedL2Ready:      false,

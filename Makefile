@@ -1,6 +1,7 @@
 .PHONY: test build mihomo-build doctor status policy-control-test
 .PHONY: desktop-build desktop-production-build desktop-test
 .PHONY: web-install web-build web-test control-build control-run menubar-build menubar-test gui-build gui-test gui-installer gui-notarize
+.PHONY: docker-build docker-push docker-push-dev docker-push-multiarch fpk fpk-x86 fpk-arm fpk-clean
 .PHONY: lab-install lab-uninstall-root lab-check lab-up lab-status lab-test
 .PHONY: lab-test-tun lab-test-tun-imported-profile lab-test-tun-imported-egress lab-test-tun-local-routing lab-test-tun-device-policy lab-test-tailscale lab-tailscale-up lab-tailscale-down lab-tailscale-destroy lab-test-ipv6-userspace lab-test-ipv6-same-wifi lab-test-ipv6-same-lan lab-test-ipv6-imported-egress lab-down lab-destroy
 .PHONY: lab-test-policy-workspace
@@ -48,6 +49,45 @@ control-build: web-build
 
 control-run: control-build
 	./bin/opensurge-control --config examples/config.example.yaml
+
+REPO ?= ghcr.io/funchs/opensurge-fnos
+VERSION ?= latest
+IMAGE ?= $(REPO):$(VERSION)
+ARCH ?= arm64
+FPK_DIR := packaging/fnos
+
+docker-build:
+	docker build --platform linux/amd64 -t $(IMAGE) .
+
+docker-push: docker-build
+	docker push $(IMAGE)
+
+docker-push-dev:
+	docker build --platform linux/$(ARCH) -t $(REPO):dev .
+	docker push $(REPO):dev
+
+docker-push-multiarch:
+	docker build --platform linux/amd64 -t $(REPO):$(VERSION)-amd64 .
+	docker push $(REPO):$(VERSION)-amd64
+	docker build --platform linux/arm64 -t $(REPO):$(VERSION)-arm64 .
+	docker push $(REPO):$(VERSION)-arm64
+	docker buildx imagetools create -t $(REPO):$(VERSION) \
+		$(REPO):$(VERSION)-amd64 $(REPO):$(VERSION)-arm64
+	[ "$(VERSION)" = latest ] || docker buildx imagetools create -t $(REPO):latest \
+		$(REPO):$(VERSION)-amd64 $(REPO):$(VERSION)-arm64
+	docker buildx imagetools inspect $(REPO):$(VERSION)
+
+fpk:
+	cd $(FPK_DIR) && ./scripts/build.sh && ./build-fpk.sh all
+
+fpk-x86:
+	cd $(FPK_DIR) && ./scripts/build.sh && ./build-fpk.sh x86
+
+fpk-arm:
+	cd $(FPK_DIR) && ./scripts/build.sh && ./build-fpk.sh arm
+
+fpk-clean:
+	rm -f $(FPK_DIR)/app.tgz $(FPK_DIR)/*.fpk
 
 menubar-build:
 	./scripts/build-menubar-app.sh

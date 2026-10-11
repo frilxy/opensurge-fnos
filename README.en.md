@@ -1,10 +1,8 @@
 <div align="center">
-  <img src="apps/desktop/Resources/OpenSurgeAppIcon.png" width="96" height="96" alt="OpenSurge for Mac App Icon">
   <h1>OpenSurge for Mac</h1>
-  <p><strong>Turn a Mac into a Surge-style whole-home transparent gateway with per-device routing—onboard selected devices in same-LAN bypass-router mode, take over DHCP/DNS automatically, and optionally enable experimental downstream IPv6 takeover.</strong></p>
+  <p><strong>Turn a Mac into a Surge-style whole-home transparent gateway with per-device routing—use it in same-LAN bypass-router mode, or take over DHCP/DNS automatically.</strong></p>
   <p>
     <a href="https://github.com/YTwsy/OpenSurge-for-Mac/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/YTwsy/OpenSurge-for-Mac?style=flat-square"></a>
-    <a href="https://opensurge.pages.dev/"><img alt="OpenSurge website" src="https://img.shields.io/badge/website-opensurge.pages.dev-2a7b62?style=flat-square"></a>
     <img alt="macOS 13+" src="https://img.shields.io/badge/macOS-13%2B-000000?style=flat-square&amp;logo=apple">
     <img alt="Apple Silicon and Intel packages" src="https://img.shields.io/badge/Apple%20Silicon%20%7C%20Intel-packages-6f42c1?style=flat-square&amp;logo=apple">
     <a href="LICENSE"><img alt="GPL-3.0-only" src="https://img.shields.io/badge/license-GPL--3.0--only-2ea44f?style=flat-square"></a>
@@ -12,11 +10,38 @@
   <p>
     <a href="README.md">简体中文</a> · <strong>English</strong>
   </p>
+</div>
+
+> ## ⚠️ This is the fnOS (FeiNiu NAS) port
+>
+> This branch ports the OpenSurge Go control plane to **fnOS (Debian 12 based)**,
+> running as a **bypass-router gateway**. The control plane is synced to upstream
+> **v0.3.0 Verdilion** (device workbench, connections page, policy workspace,
+> Tailscale outbound, source snapshot export). Delivery:
+>
+> - Docker image `ghcr.io/funchs/opensurge-fnos:v0.1.1` (`linux/amd64` + `linux/arm64`)
+> - Optional **fnOS App Center `.fpk`** package (recommended for end users)
+>
+> | Audience | Doc |
+> | --- | --- |
+> | App Center install (`.fpk`) | **[FPK user guide (中文)](docs/fnos-port/FPK-USER-GUIDE.md)** |
+> | Docker Compose / SSH | [DEPLOY.md](docs/fnos-port/DEPLOY.md) |
+> | Port design | [DESIGN.md](docs/fnos-port/DESIGN.md) |
+>
+> Web GUI (LAN): `http://<NAS-IP>:61767/enter` — use `/enter` to establish a session.
+>
+> Everything below is largely upstream macOS documentation. **pkg installer, menu
+> bar app, launchd, pf, and networksetup do not apply here** — those artifacts
+> were removed. Gateway logic, per-device policy, and Web GUI are shared.
+>
+> Differences from macOS: host NIC config is managed by fnOS system settings
+> (`ErrManagedByFnOS`); DHCP takeover is not the default fnOS path; firewall is
+> nftables instead of pf.
+
+<div align="center">
   <p>
-    <a href="https://opensurge.pages.dev/">Website</a> ·
     <a href="https://github.com/YTwsy/OpenSurge-for-Mac/releases">Download</a> ·
-    <a href="https://opensurge.pages.dev/docs/">Documentation</a> ·
-    <a href="docs/user/app-user-guide.md">App guide</a> ·
+    <a href="docs/app-user-guide.md">App guide</a> ·
     <a href="#capabilities">Capabilities</a> ·
     <a href="#per-device-policies">Per-device policies</a> ·
     <a href="#web-gui-and-menu-bar-app">Web GUI</a> ·
@@ -25,16 +50,15 @@
   <table width="100%">
     <tr>
       <td width="66%" valign="top">
-        <img src="docs/images/readme/en/dashboard.png" width="100%" alt="OpenSurge whole-home gateway dashboard">
+        <img src="docs/images/opensurge-dashboard.png" width="100%" alt="OpenSurge whole-home gateway dashboard">
       </td>
       <td width="34%" valign="top">
-        <img src="docs/images/readme/en/policies.png" width="100%" alt="OpenSurge policy and proxy health view">
+        <img src="docs/images/opensurge-policies.png" width="100%" alt="OpenSurge policy and proxy health view">
         <br>
-        <img src="docs/images/readme/en/devices.png" width="100%" alt="OpenSurge per-device policy view">
+        <img src="docs/images/opensurge-devices.png" width="100%" alt="OpenSurge per-device policy view">
       </td>
     </tr>
   </table>
-  <p><sub>Screenshots use isolated fictional demo data.</sub></p>
 </div>
 
 OpenSurge for Mac is an open-source, Surge-style macOS gateway and control
@@ -42,7 +66,7 @@ plane. Most users can start in same-LAN bypass-router mode: keep the main
 router's DHCP enabled, give selected devices stable IPv4 addresses, and point
 their gateway and DNS to the Mac. For automatic onboarding across an existing
 LAN, choose LAN DHCP takeover; for a separate AP, SSID, or VLAN, use an
-isolated downstream LAN. All three modes can optionally enable experimental downstream IPv6 takeover.
+isolated downstream LAN.
 
 Every mode supports independent egress policies for registered devices: use
 rule-based routing for both the phone and local Mac, route the game console
@@ -51,40 +75,19 @@ takeover and isolated downstream-LAN modes, phones, TVs, PS5 consoles, and VR
 headsets can automatically obtain DHCP/DNS from the Mac without per-device
 gateway or DNS changes.
 
-> For feature overviews, setup instructions, and practical guides, visit the [OpenSurge website](https://opensurge.pages.dev/).
->
-> [Features](https://opensurge.pages.dev/features/) · [Guides](https://opensurge.pages.dev/guides/) · [Documentation](https://opensurge.pages.dev/docs/)
-
-<details>
-  <summary><strong>OpenSurge in 10 images</strong></summary>
-
-  <p>Scroll horizontally to explore the full gallery.</p>
-
-  <pre><img src="docs/images/readme/gallery-en/01-home-gateway.png" width="480" alt="Your Mac as a whole-home network gateway"><img src="docs/images/readme/gallery-en/02-per-device-routing.png" width="480" alt="Independent routes for each device"><img src="docs/images/readme/gallery-en/03-network-topologies.png" width="480" alt="Three network topologies, starting with one device"><img src="docs/images/readme/gallery-en/04-prepare-policies.png" width="480" alt="Prepare and preview policies before starting the gateway"><img src="docs/images/readme/gallery-en/05-network-overview.png" width="480" alt="Gateway status, live traffic, and active devices"><img src="docs/images/readme/gallery-en/06-independent-mac-routing.png" width="480" alt="Independent routing controls for the local Mac"><img src="docs/images/readme/gallery-en/07-reusable-rules.png" width="480" alt="Reusable rule sets and routing templates"><img src="docs/images/readme/gallery-en/08-diagnostics-recovery.png" width="480" alt="Diagnostics and guided network recovery"><img src="docs/images/readme/gallery-en/09-optional-connectivity.png" width="480" alt="Optional Tailscale outbound and experimental downstream IPv6"><img src="docs/images/readme/gallery-en/10-get-opensurge.png" width="480" alt="Get OpenSurge for Mac and visit the website"></pre>
-</details>
-
 | Mode | Best for | Effect on the existing network |
 | --- | --- | --- |
 | **Same-LAN bypass-router mode (common; recommended first step)** | Starting with selected phones, TVs, game consoles, or other devices | Main-router DHCP stays enabled; selected devices use stable IPv4 addresses and manually point their gateway and DNS to the Mac |
 | **LAN DHCP takeover (advanced · automatic onboarding)** | Automatically connecting devices on the same LAN to OpenSurge | Follow the guided flow to disable main-router DHCP and restore it when stopping |
 | **Isolated downstream LAN** | A separate AP, SSID, or VLAN | Existing-LAN DHCP stays unchanged; the Mac provides DHCP/DNS and the gateway for the isolated downstream network |
 
-- Importing a mihomo profile or subscription is optional. The **Global Profile
-  Overlay** panel, collapsed by default, can independently add proxies,
-  providers, policy groups, DNS settings, and rules. Even with the gateway
-  stopped and no imported source, preview the final composed configuration,
-  select nodes, and test latency on the Policies page, or start that same
-  configuration directly from the Web GUI. Refreshing a subscription or saving
-  a draft does not automatically change the running gateway.
+- Import an existing mihomo subscription. OpenSurge takes ownership only of
+  gateway-critical fields without replacing its nodes or rules.
 - Use the Web GUI and menu bar app to see which devices are active, how much
   traffic they are moving, and which egress chain they use.
-- Temporarily keep the Mac running with its lid closed from either UI. The
-  switch is off by default and applies only to the current OpenSurge run.
 
-Under the hood, dnsmasq provides DHCP/DNS and mihomo serves as the proxy
-engine. IPv4 uses macOS pf plus forwarding for the native gateway path;
-experimental downstream IPv6 uses dnsmasq RA/SLAAC/RDNSS, a macOS BPF packet
-broker, and the userspace data plane in the OpenSurge-patched mihomo build.
+Under the hood, dnsmasq provides DHCP/DNS, mihomo serves as the proxy engine,
+and macOS pf plus IPv4 forwarding provide the native gateway path.
 
 The repository is also designed as an
 [AI-agent-friendly engineering workspace](#an-ai-agent-friendly-engineering-workspace):
@@ -98,31 +101,20 @@ into the next engineering loop.
 
 - Use the macOS menu bar app to check status, receive recovery warnings, and
   open the local Web GUI.
-- Temporarily prevent idle and lid-close sleep independently of gateway state;
-  the non-persistent switch releases when OpenSurge quits or the Mac reboots.
 - Import sources, configure the network, route individual devices, check proxy
   health and connectivity, and inspect diagnostics from one control surface.
 - Follow a recovery state machine through same-LAN DHCP takeover startup,
   client validation, shutdown, and network restoration.
 
-Start with the [OpenSurge for Mac App User Guide](docs/user/app-user-guide.md). For
+Start with the [OpenSurge for Mac App User Guide](docs/app-user-guide.md). For
 common local-network, TUN, and device configuration questions, see the
-[FAQ](docs/user/faq.md).
+[FAQ](docs/faq.md).
 
 **Gateway and proxying**
 
 - Start and stop DHCP/DNS, mihomo, pf NAT, and IPv4 forwarding with rollback.
 - Provide explicit proxying through mihomo `mixed-port`.
 - Provide transparent proxying through mihomo TUN on macOS.
-- Use Tailscale or Headscale as an on-demand mihomo outbound for explicit
-  MagicDNS suffixes, Tailnet peers, accepted subnet routes, or an optional
-  per-device Exit Node.
-- In experimental downstream IPv6 mode, isolated-LAN and whole-LAN DHCP
-  takeover use dnsmasq RA/SLAAC/RDNSS for automatic onboarding, while
-  bypass-router mode uses manual ULAs. IPv6 traffic does not enter a macOS
-  system TUN; the BPF packet broker sends it to the OpenSurge-patched mihomo
-  gVisor data plane, which covers TCP, UDP, and QUIC carried over UDP/443 while
-  retaining MAC-backed device identity.
 - Switch **Rule / Global / Direct** for new local-Mac connections entering
   TUN or the explicit proxy without changing downstream devices. OpenSurge
   leaves macOS system-proxy settings unchanged by default, with an explicit
@@ -137,8 +129,8 @@ common local-network, TUN, and device configuration questions, see the
 - Attribute active-session traffic to DHCP devices or same-LAN registered and
   currently observed devices, showing per-device connection counts, live
   upload/download rates, cumulative bytes, and the dominant mihomo egress chain.
-- Test proxy-node reachability and latency with the gateway running or stopped,
-  and switch Selectors from the final composed policy view.
+- Test proxy-node reachability and latency in one place, then switch an applied
+  Selector from the health view.
 - Probe a fixed catalog of real services through the applied mihomo mixed-port
   and current local-Mac mode, showing the three-round median latency, matched
   rule, and actual egress chain.
@@ -160,80 +152,43 @@ One mihomo process can apply independent policies to registered LAN devices.
 DHCP takeover mode gives each device a MAC-backed fixed IPv4 lease. Same-LAN
 manual-gateway mode instead uses an IPv4 kept stable by the main router and can
 assist registration with current traffic plus ARP-neighbor observations. Both
-topologies emit per-device mihomo selector groups and `SRC-IP-CIDR` rules. The installed app
-enables per-device policies by default, and the Web GUI keeps them enabled. The JSON
+topologies emit per-device mihomo selector groups and `SRC-IP-CIDR` rules. The optional JSON
 policy file lets each device either follow gateway rules or take a
 dedicated device selector before global rules. It also supports direct
 device-specific actions such as `REJECT` and domain/IP/protocol/port/rule-provider
 overlays. Local/private destinations remain direct in dedicated mode. The
 local-Mac Rule / Global / Direct switch does not change those downstream rules;
-see [local Mac routing modes](docs/user/local-mac-routing.md).
+see [local Mac routing modes](docs/local-mac-routing.md).
 
-The Web GUI rule library manages rule sets, outlet-free routing templates, and
-the per-device outlet selected after a match as separate concepts. It includes
-an inspectable community Claude Code example, but does not apply that example
-to any device by default. Operators supply all other policy content; the empty
-starter file remains valid. See [per-device policy overlays](docs/user/device-policy.md)
-for the JSON model, precedence, CLI commands, and validation boundary.
-
-### Tailscale outbound
-
-The **Proxy and rule sources** page can manage one OpenSurge-owned Tailscale
-outbound. The Auth Key is write-only and stored in a separate `0600` file;
-the persistent `state-dir` keeps the same local Tailnet identity across reloads
-and temporary disable/enable cycles. Forgetting that local identity is a
-separate action available only while Tailscale and the gateway are stopped,
-and does not remove the device from the Tailscale or Headscale admin console.
-
-The inline, collapsible setup panel reads the local Tailscale app in
-discovery-only mode and shows
-the current Tailnet's MagicDNS suffix, exact peer addresses, online state,
-accepted private routes, and eligible Exit Nodes as suggestions that require
-confirmation. It never saves or broadens access automatically. A successful
-discovery stores a restricted cache without credentials, so configuration can
-continue after the local app disconnects. The panel labels the information
-source and check/cache time instead of presenting a snapshot as live state. Initial
-registration still requires a separate Auth Key; the panel links to the
-official Keys page and recommends a one-off, non-Ephemeral key. The local app
-and the OpenSurge-managed node do not share login identity or state, and the
-advanced manual configuration remains available when discovery is unavailable.
-
-Tailnet-only access is destination-scoped and fails closed. It never becomes a
-general device egress. Only an outbound with an explicit Exit Node appears in
-per-device outlet selectors. Remote subnet routes must be confirmed explicitly
-and are rejected when they overlap the OpenSurge LAN. Mihomo starts its
-Tailscale node lazily on the outbound's first request. OpenSurge sends a
-best-effort warm-up after gateway start, reload, and mihomo recovery, but the
-first application request may still need a retry. Tailnet-only status remains
-on-demand instead of being tested against a public `generate_204` URL.
-
-This integration is outbound-only: OpenSurge does not advertise its local LAN,
-act as a subnet router, or expose inbound services through the managed node.
+OpenSurge intentionally ships no household templates or third-party rule
+lists. Operators supply their own policy content; the empty starter file is
+valid. See [per-device policy overlays](docs/device-policy.md) for the JSON
+model, precedence, CLI commands, and validation boundary.
 
 ## Web GUI and menu bar app
 
 If you installed OpenSurge from a package, start with the
-[OpenSurge for Mac App User Guide](docs/user/app-user-guide.md).
+[OpenSurge for Mac App User Guide](docs/app-user-guide.md).
 
-Starting with v0.3.0, the PKG uses a Wails + system WebView desktop app with the shared
-React main window and tray panel. The independent loopback Control API and browser UI
-remain supported. The v0.2.4 Swift host is retained for historical maintenance; see the
-[installer acceptance boundaries](docs/agent-wiki/sources/validation/evidence-map.md#桌面与安装). For a development build:
+The repository now includes the loopback Go Control API, an embedded React Web
+GUI, and a read-only native SwiftUI menu bar launcher. For a development build:
 
 ```sh
 make web-install
 make control-build
 ./bin/opensurge-control --config examples/config.example.yaml
-make desktop-production-build
 ```
+
+> The fnOS port has no menu bar app (`make menubar-build` was removed along with
+> the Swift sources). Delivery is a Docker image: `make docker-push IMAGE=...`.
+> See the [fnOS deployment guide](docs/fnos-port/DEPLOY.md).
 
 The control service listens only on `127.0.0.1` and prints a one-time Web GUI
 bootstrap link. The menu bar app shows status and recovery warnings and opens
-the existing desktop main window. Apart from the independent temporary lid-closed-operation switch,
-it deliberately has no gateway start/stop or policy-selection actions. It
-separates quitting only the desktop app from quitting OpenSurge.
+the Web GUI; it deliberately has no gateway start/stop or policy-selection
+actions. It separates quitting only the menu bar app from quitting OpenSurge.
 The latter is available only after the gateway data plane has stopped, and
-quits the desktop app plus the user-level Control Service. The launchd-managed
+quits the menu bar app plus the user-level Control Service. The launchd-managed
 root Helper remains loaded and idle, so reopening OpenSurge needs no new
 administrator authorization.
 The menu bar also provides a separate Uninstall OpenSurge action. Once the
@@ -244,9 +199,14 @@ The Web GUI includes a native connectivity page for the applied configuration
 plus current local-Mac mode and links to Net.Coffee for a separate browser-local
 check. Neither result is presented as proof of downstream gateway rules or a
 device's DHCP/DNS/TUN path.
-See [development](docs/agent-wiki/sources/development.md) for local builds,
-[Control API](docs/agent-wiki/sources/control-api.md) for authentication and permissions,
-and [distribution](docs/agent-wiki/sources/distribution.md) for installation and uninstall.
+See the [GUI architecture notes](docs/gui-architecture.zh-CN.md) for the current
+security and packaging boundary.
+
+> **The following section describes upstream's macOS installer flow and does not
+> apply to the fnOS port.** The macOS packaging scripts, launchd plists, pkg
+> scripts, and signing/notarization pipeline were deleted from this branch, which
+> ships only a Docker image. The text is kept to minimize rebase conflicts with
+> upstream.
 
 `make gui-installer` builds a macOS package after requiring real mihomo and
 dnsmasq binaries. Developer ID signing and notarization are opt-in through the
@@ -279,92 +239,23 @@ start it from the control plane.
 Package upgrades refuse to run while same-LAN DHCP recovery is incomplete.
 Before replacing payload files, preinstall stops the menu bar app so it cannot
 wake the Control Service, then unloads the user Control Service, runs the
-current-version recovery CLI embedded in the new package against the installed
-config, and unloads the root helper. The existing config,
+installed `omg stop`, and unloads the root helper. The existing config,
 imported sources, policy data, and runtime history are kept;
 only a first installation seeds `config.yaml` from the packaged example.
 
-## Transparent proxying and downstream IPv6 takeover
+## Transparent proxying
 
-OpenSurge uses two transparent data paths with different ingress mechanisms
-but shared mihomo rules and outbounds. Downstream IPv4 and local-Mac transparent
-proxying use the mihomo TUN mainline; experimental downstream IPv6 enters
-mihomo gVisor through the macOS BPF packet broker and the OpenSurge-patched
-`opensurge-packet` listener.
-
-Both paths require `transparent.mode: "tun"` as an overall gateway prerequisite,
-but downstream IPv6 traffic does not enter a macOS system utun. This does not
-reactivate `redir-port` or PF TCP redirection.
-
-### mihomo TUN mainline
-
-Downstream IPv4 and local-Mac transparent proxying use mihomo TUN. Mihomo
-`redir-port` and PF TCP redirection remain intentionally unsupported because
-the current Darwin build reports redir as unsupported at runtime. Keep
-`mihomo.redir_port` and `pf.redirect_tcp_to` at `0`.
+TUN is the supported transparent proxy path on macOS. Mihomo `redir-port` and
+PF TCP redirection are intentionally unsupported because the current Darwin
+build reports redir as unsupported at runtime. Keep `mihomo.redir_port` and
+`pf.redirect_tcp_to` at `0`; enable transparent proxying with
+`transparent.mode: "tun"`.
 
 OpenSurge does not predict conflicts from existing utun interfaces or public
 routes before startup. It waits for mihomo to report the TUN runtime as ready.
 Failure gives the process a short cleanup window, rolls back the gateway
 runtime, and enriches the actual TUN error with the selected route interface
 and gateway. Two full-route TUNs are not supported by default.
-
-Mac IPv6 TUN routing works independently of downstream takeover. TUN captures
-public IPv6 and the full fake IPv6 pool; `dns.ipv6` only controls AAAA answers.
-`local_system_dns.enabled` defaults to true and manages the upstream network
-service's DNS after automatic TUN routes are ready. Stop and engine restart
-restore the original DNS while preserving external changes. Disable it with
-the Web GUI's “Mac system DNS” setting. Imported profiles must use explicit
-DNS resolvers: `system` would create a resolver loop and is rejected.
-
-### Downstream IPv6 takeover (experimental)
-
-The Network page exposes two independent controls. `dns.ipv6` decides whether
-OpenSurge DNS answers AAAA queries and creates fake IPv6 addresses.
-`transparent.tun_ipv6` controls the downstream IPv6 gateway, SLAAC/RDNSS, and
-userspace packet path, with `off`, `auto`, and `always` modes. `auto` activates
-only when the upstream interface has both a public global IPv6 address (ULA
-does not count as public reachability) and an IPv6 default route. `always`
-establishes the downstream path even without native upstream IPv6.
-
-All three topologies require `transparent.mode: "tun"`. Isolated downstream
-LAN publishes RA/SLAAC/RDNSS automatically. Same-LAN DHCP takeover can do the
-same for the whole LAN after the main router's IPv6 RA/DHCPv6 is disabled (or
-RA Guard makes OpenSurge the only default-router provider) and
-`transparent.ipv6_shared_l2_ready: true` is confirmed. Both automatic modes
-use the standard Medium RA router preference. Bypass-router mode sends no RA:
-only clients manually configured with an OpenSurge ULA, the Mac's link-local
-default gateway and DNS address, and no competing router default route
-are enrolled. The Network page shows an IPv4/IPv6 fill-in card.
-
-This IPv6 data plane depends on the `opensurge-packet` listener added to mihomo
-by OpenSurge. The mihomo binary in OpenSurge packages is built from pinned
-upstream source after applying the packet-listener patch in
-[`patches/mihomo`](patches/mihomo/); it is not an unmodified upstream binary.
-Exact versions, licenses, and upstream sources are listed in
-[Third-Party Notices](THIRD_PARTY_NOTICES.md).
-
-Downstream IPv6 traffic does not enter a macOS system utun. The macOS BPF
-broker reads the IPv6 L3 packet and source MAC from the physical Ethernet frame
-and passes them through a mode-`0600` Unix datagram to the `opensurge-packet`
-listener. The listener injects the packet into mihomo gVisor, maps the MAC to
-`IN-USER(device:<id>)`, and reuses the existing device rules and outbounds.
-Return packets travel back through the broker to the downstream Ethernet. This
-path covers TCP and UDP. QUIC is carried over UDP/443; this is not a claim that
-arbitrary IPv6 protocols are proxied.
-
-Per-device **Direct via main router** in DHCP takeover bypasses only IPv4.
-When downstream IPv6 is enabled, IPv6 from that device that reaches the
-OpenSurge packet path receives a highest-priority `REJECT`; other devices keep
-their normal IPv6 policy. The client may still retain SLAAC addresses or RDNSS,
-so the UI says **IPv6 egress blocked** rather than claiming IPv6 is absent. If
-the main router still publishes RA, the client can bypass OpenSurge over IPv6;
-disable the main-router RA/DHCPv6 or enforce RA Guard.
-
-`always` does not invent public IPv6 connectivity. With no native upstream
-IPv6, fake IPv6 destinations can still use a proxy that supports the required
-traffic, while `DIRECT` to a real public IPv6 address has no upstream route.
-An HTTP-only proxy cannot carry UDP/QUIC.
 
 ## Mihomo profiles
 
@@ -378,37 +269,17 @@ its non-gateway DNS resolver/filter fields. Preserving fields such as
 server hostnames resolvable without allowing the profile to replace the
 gateway DNS listener or TUN DNS contract.
 
-Importing a profile is not required for advanced configuration. The Web GUI's
-**Global Profile Overlay** can independently add proxies, providers, manual
-policy groups, and rules to a minimal managed profile. While the gateway is
-stopped, the Policies page uses a prepared mihomo instance to show the final
-configuration, select nodes, and test latency without taking over TUN,
-DHCP/DNS, PF, or forwarding. You can also start directly from the Web GUI
-without first visiting Policies: the server composes the configuration,
-validates it with a real `mihomo -t`, then saves and starts that same candidate.
-
-Previewing, selecting nodes, and testing latency do not commit the desired
-configuration. Saving an overlay draft while the gateway is running does not
-change live traffic. An overlay-only draft takes effect on the next gateway
-start from the Web GUI; `sudo omg start` continues to use the persisted
-configuration and does not read Web GUI drafts.
-
 ```yaml
 mihomo:
   profile_mode: "imported"
   profile: "./profiles/home.yaml"
-  store_fake_ip: true
 ```
 
 Relative `mihomo.profile` paths are resolved from the OpenSurge config file's
 directory. Relative `path:` entries inside imported `proxy-providers` and
 `rule-providers` are resolved from the imported mihomo profile's directory.
 OpenSurge renders `profile.store-selected: true` so mihomo can persist policy
-group choices across restarts. The default `mihomo.store_fake_ip: true` renders
-`profile.store-fake-ip: true` and restores existing fake-IP mappings after an
-apply/restart. You can disable it while the gateway is stopped under **Advanced
-Mihomo / DNS settings**, but cached fake IPs held by long-running processes may
-then become stale after mihomo restarts.
+group choices across restarts.
 
 Preview the final generated mihomo config before starting gateway services:
 
@@ -430,7 +301,7 @@ go run ./cmd/omg validate-mihomo --config examples/config.imported-profile.examp
 
 These commands are intended for development, automation, and diagnostics.
 Package users can follow the graphical workflow in the
-[App User Guide](docs/user/app-user-guide.md).
+[App User Guide](docs/app-user-guide.md).
 
 ### Status and diagnostics
 
@@ -580,7 +451,7 @@ The verification layers are complementary:
 
 Virtual Lab results do not stand in for real-device behavior, and one physical
 smoke does not replace the deterministic Lab gates. See the
-[validation contract](docs/agent-wiki/sources/validation/test-gates.md) for the
+[validation contract](docs/agent-wiki/wiki/concepts/validation-gates.md) for the
 exact claim each gate is allowed to support.
 
 ### Agent Wiki: externalized project memory
@@ -589,23 +460,16 @@ The [Agent Wiki](docs/agent-wiki/wiki/index.md) applies the LLM Wiki idea of
 moving durable memory out of a transient context window and into a small,
 versioned, source-backed knowledge layer:
 
-- `docs/agent-wiki/sources/` maintains project specifications, domain contracts,
-  validation methods and scoped evidence.
-- `docs/agent-wiki/wiki/concepts/` explains concepts, relationships and responsibilities
-  with short text and optional diagrams, linking to the relevant sources. Known
-  questions can go directly to a source or code.
-- `docs/user/` collects operator-facing installation, configuration and usage guides.
+- `docs/agent-wiki/sources/` records stable project briefs, decisions, and
+  validation contracts.
+- `docs/agent-wiki/wiki/` distills those sources into short, linked pages that
+  an agent can load progressively for the task at hand.
 - `.codex/hooks.json` integrates the local Session Wiki hook, when installed,
   so session continuity and compaction can use project-local memory without
   committing private session state.
 
-Current contracts, validation methods and historical results state their own scope.
-Earlier records do not establish acceptance of the current checkout. Full one-off
-logs, temporary ideas and ordinary TODOs stay with the current work context.
-Existing completed tasks and execution reports move to
-`docs/agent-wiki/tasks/finished_archived/`, excluded from default searches by `.ignore`.
-Validation sources maintain reusable methods and necessary evidence summaries,
-without adding a page for each test run.
+Only reusable, verified knowledge belongs in this layer. One-off logs,
+temporary output, unverified guesses, and ordinary TODOs do not.
 
 ## License
 
@@ -657,32 +521,6 @@ egress paths, and enforce a device-level domain `REJECT`. Domain/protocol rule
 compilation, templates, and HTTP/MRS rule-provider configuration are covered by
 unit tests; they do not require one Lab run per operator-defined rule.
 
-Use `make lab-test-tailscale` when changing Tailscale destination/source rules,
-MagicDNS, managed-tsnet configuration, or native-app discovery. A dedicated
-Lima Tailnet peer verifies TCP/UDP to an exact peer IP, the complete MagicDNS
-name, Control API discovery, one-device authorization, and fail-closed behavior
-for the other device. The peer-observed source address also rules out a false
-positive through the Mac's native Tailscale route. The first run needs external
-mode-`0600` auth-key files for the peer and managed node: either two one-off keys
-or one reusable, non-Ephemeral key shared by both file variables. Persisted
-identities make ordinary reruns keyless. This bounded gate does not prove a
-subnet router, Exit Node, Headscale, or a real remote LAN.
-
-When changing downstream RA/SLAAC, the BPF broker, the patched Mihomo packet
-listener, IPv6 device identity, or withdrawal on stop, run the topology gates:
-`make lab-test-ipv6-userspace`, `make lab-test-ipv6-same-wifi`, and
-`make lab-test-ipv6-same-lan`. Automatic-RA gates require two clients to
-obtain OpenSurge IPv6 addresses, Medium-preference default routes, and
-link-local DNS. The bypass-router gate requires manual ULAs, the Mac
-link-local default gateway and DNS, and no RA. All three use controlled local
-fixtures to verify TCP, a UDP request/response, a QUIC-shaped UDP carrier, and
-a real HTTP/3-only request/response with no TCP or HTTP/2 fallback. HTTP/3 is
-checked through `DIRECT`, a controlled UDP-capable SOCKS5 outbound, and an
-HTTP-only fail-closed outbound, together with per-device policy, bidirectional
-BPF evidence, and rollback. This bounded gate does not cover every QUIC/HTTP3
-implementation, version, connection-migration case, or public proxy
-combination.
-
 Use `make policy-control-test` for policy-control and machine-readable CLI
 changes. It starts the real mihomo binary without sudo, dnsmasq, pf, or TUN and
 checks `policies`, invalid and valid `policy-select`, persisted selection
@@ -731,10 +569,6 @@ make lab-test-tun
 make lab-test-tun-imported-profile
 make lab-test-tun-imported-egress
 make lab-test-tun-device-policy
-make lab-test-tailscale
-make lab-test-ipv6-userspace
-make lab-test-ipv6-same-wifi
-make lab-test-ipv6-same-lan
 make lab-down
 ```
 

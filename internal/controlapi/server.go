@@ -13,6 +13,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,8 +31,13 @@ import (
 )
 
 type Options struct {
-	ConfigPath        string
-	Addr              string
+	ConfigPath string
+	Addr       string
+	// BaseURL is the browser-facing origin. Empty means "http://" + Addr.
+	// Non-loopback listen addresses require BaseURL (fnOS / Docker LAN access).
+	BaseURL string
+	// ExtraHosts are additional allowed Host names (domains / reverse proxies).
+	ExtraHosts        []string
 	StoreDir          string
 	Runner            ActionRunner
 	NetworkRunner     NetworkRunner
@@ -88,6 +94,7 @@ type Server struct {
 	policyWorkspaceLease  policyWorkspaceLease
 	token                 string
 	baseURL               string
+	allowedHosts          map[string]struct{}
 
 	mu          sync.Mutex
 	lifecycleMu sync.Mutex
@@ -114,8 +121,33 @@ func New(options Options) (*Server, error) {
 		options.Addr = "127.0.0.1:61767"
 	}
 	host, _, err := net.SplitHostPort(options.Addr)
-	if err != nil || (host != "127.0.0.1" && host != "localhost") {
+	if err != nil {
 		return nil, fmt.Errorf("control API must listen on loopback IPv4")
+	}
+	baseURL := "http://" + options.Addr
+	allowedHosts := map[string]struct{}{}
+	if trimmed := strings.TrimSuffix(strings.TrimSpace(options.BaseURL), "/"); trimmed != "" {
+		parsed, err := url.Parse(trimmed)
+		if err != nil || parsed.Hostname() == "" {
+			return nil, fmt.Errorf("control API base URL is invalid: %s", trimmed)
+		}
+		baseURL = trimmed
+		allowedHosts[strings.ToLower(parsed.Hostname())] = struct{}{}
+	} else if host != "127.0.0.1" && host != "localhost" {
+		return nil, fmt.Errorf("control API must listen on loopback IPv4 unless BaseURL is set")
+	}
+	for _, extra := range options.ExtraHosts {
+		extra = strings.ToLower(strings.TrimSpace(extra))
+		if extra == "" {
+			continue
+		}
+		if h, _, err := net.SplitHostPort(extra); err == nil {
+			extra = h
+		}
+		extra = strings.Trim(extra, "[]")
+		if extra != "" {
+			allowedHosts[extra] = struct{}{}
+		}
 	}
 	if options.StoreDir == "" {
 		home, err := os.UserHomeDir()
@@ -237,7 +269,8 @@ func New(options Options) (*Server, error) {
 		mihomoRecovery:  newMihomoRecoveryController(),
 		sleepPrevention: newSleepPreventionController(options.SleepRunner, configPath),
 		token:           token,
-		baseURL:         "http://" + options.Addr,
+		baseURL:         baseURL,
+		allowedHosts:    allowedHosts,
 		sessions:        map[string]time.Time{},
 		bootstraps:      map[string]bootstrapGrant{},
 	}, nil
@@ -259,6 +292,7 @@ func (s *Server) bootstrapURLFor(path string) string {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /bootstrap", s.exchangeBootstrap)
+	mux.HandleFunc("GET /enter", s.handleEnter)
 	mux.HandleFunc("POST /api/v1/session/bootstrap", s.handleSessionBootstrap)
 	mux.Handle("GET /api/v1/overview", s.auth(http.HandlerFunc(s.handleOverview)))
 	mux.Handle("GET /api/v1/config", s.auth(http.HandlerFunc(s.handleControlConfig)))
@@ -446,20 +480,109 @@ func (s *Server) Serve(ctx context.Context) error {
 	return err
 }
 
+func (s *Server) hostAllowed(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "127.0.0.1" || host == "localhost" || host == "::1" {
+		return true
+	}
+	if !s.lanMode() {
+		return false
+	}
+	if s.allowedHosts != nil {
+		if _, ok := s.allowedHosts[host]; ok {
+			return true
+		}
+	}
+	if isFnOSConnectHost(host) {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.To4() != nil && ip.IsPrivate() {
+		return true
+	}
+	if strings.HasSuffix(host, ".local") && isDNSLabel(strings.TrimSuffix(host, ".local")) {
+		return true
+	}
+	return false
+}
+
+func (s *Server) lanMode() bool {
+	return len(s.allowedHosts) > 0
+}
+
+func isFnOSConnectHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	const suffix = ".fnos.net"
+	if !strings.HasSuffix(host, suffix) {
+		return false
+	}
+	rest := strings.TrimSuffix(host, suffix)
+	app, fnid, ok := strings.Cut(rest, ".")
+	if !ok || app != "opensurge" || fnid == "" || strings.Contains(fnid, ".") {
+		return false
+	}
+	return isDNSLabel(fnid)
+}
+
+func isDNSLabel(s string) bool {
+	if len(s) == 0 || len(s) > 63 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		ok := (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-'
+		if !ok {
+			return false
+		}
+		if (i == 0 || i == len(s)-1) && c == '-' {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Server) originAllowed(origin string) bool {
+	if origin == "" {
+		return false
+	}
+	if origin == s.baseURL {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Hostname() == "" {
+		return false
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+	return s.hostAllowed(parsed.Hostname())
+}
+
+func requestIsHTTPS(r *http.Request) bool {
+	if r != nil && r.TLS != nil {
+		return true
+	}
+	if r == nil {
+		return false
+	}
+	proto := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")))
+	return proto == "https"
+}
+
 func (s *Server) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host
 		if parsed, _, err := net.SplitHostPort(r.Host); err == nil {
 			host = parsed
 		}
-		if host != "127.0.0.1" && host != "localhost" {
-			writeError(w, http.StatusForbidden, "invalid_host", "request host is not allowed")
+		if !s.hostAllowed(host) {
+			writeError(w, http.StatusForbidden, "invalid_host",
+				fmt.Sprintf("request host %q is not allowed (expect BaseURL host, private LAN IP, opensurge.<fnid>.fnos.net, or OPENSURGE_ALLOWED_HOSTS)", host))
 			return
 		}
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -481,7 +604,7 @@ func (s *Server) auth(next http.Handler) http.Handler {
 			}
 			s.mu.Unlock()
 			if sessionOK {
-				setWebSessionCookie(w, cookie.Value, now)
+				setWebSessionCookie(w, cookie.Value, now, requestIsHTTPS(r))
 			}
 		}
 		if !bearerOK && !sessionOK {
@@ -490,7 +613,7 @@ func (s *Server) auth(next http.Handler) http.Handler {
 		}
 		if !bearerOK && r.Method != http.MethodGet && r.Method != http.MethodHead {
 			origin := r.Header.Get("Origin")
-			if origin != s.baseURL {
+			if !s.originAllowed(origin) {
 				writeError(w, http.StatusForbidden, "origin_rejected", "mutation origin is not allowed")
 				return
 			}
@@ -511,16 +634,30 @@ func (s *Server) exchangeBootstrap(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bootstrap link is invalid or expired", http.StatusUnauthorized)
 		return
 	}
+	s.issueWebSession(w, r, grant.path)
+}
+
+func (s *Server) handleEnter(w http.ResponseWriter, r *http.Request) {
+	if !s.lanMode() {
+		http.Error(w, "LAN enter is only available when BaseURL is configured", http.StatusUnauthorized)
+		return
+	}
+	path := allowedWebPath(r.URL.Query().Get("path"))
+	s.issueWebSession(w, r, path)
+}
+
+func (s *Server) issueWebSession(w http.ResponseWriter, r *http.Request, path string) {
+	path = allowedWebPath(path)
 	session := randomToken(32)
 	now := time.Now()
 	s.mu.Lock()
 	s.sessions[session] = now.Add(webSessionIdleTimeout)
 	s.mu.Unlock()
-	setWebSessionCookie(w, session, now)
-	http.Redirect(w, r, "/"+grant.path, http.StatusFound)
+	setWebSessionCookie(w, session, now, requestIsHTTPS(r))
+	http.Redirect(w, r, "/"+path, http.StatusFound)
 }
 
-func setWebSessionCookie(w http.ResponseWriter, session string, now time.Time) {
+func setWebSessionCookie(w http.ResponseWriter, session string, now time.Time, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "opensurge_session",
 		Value:    session,
@@ -528,6 +665,7 @@ func setWebSessionCookie(w http.ResponseWriter, session string, now time.Time) {
 		Expires:  now.Add(webSessionIdleTimeout),
 		MaxAge:   int(webSessionIdleTimeout / time.Second),
 		HttpOnly: true,
+		Secure:   secure,
 		SameSite: http.SameSiteStrictMode,
 	})
 }
@@ -555,7 +693,7 @@ func allowedWebPath(value string) string {
 	switch value {
 	case "network", "recovery":
 		return "network"
-	case "sources", "devices", "policies", "connectivity", "diagnostics":
+	case "sources", "devices", "policies", "connectivity", "diagnostics", "connections":
 		return value
 	default:
 		return "dashboard"

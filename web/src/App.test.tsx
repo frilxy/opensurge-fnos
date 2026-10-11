@@ -308,11 +308,13 @@ describe('OpenSurge app shell', () => {
     }
     vi.stubGlobal('EventSource', TestEventSource)
     vi.mocked(api.overview).mockRejectedValueOnce(new RequestError(401, 'authentication_required', 'expired'))
+    window.sessionStorage.setItem('opensurge-enter-attempted', '1')
 
     render(<App />)
 
     expect(await screen.findByRole('heading', { name: 'Web GUI 与 OpenSurge 的安全连接已过期' })).toBeTruthy()
-    expect(screen.getByText('请点击 macOS 菜单栏中的 OpenSurge 图标，然后选择“打开 OpenSurge 面板”。')).toBeTruthy()
+    expect(screen.getByText('局域网部署请打开 /enter 重新建立会话；桌面版请从菜单栏重新打开面板。')).toBeTruthy()
+    expect(screen.getByRole('link', { name: '/enter' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '重试' })).toBeNull()
     await waitFor(() => expect(close).toHaveBeenCalled())
   })

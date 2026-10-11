@@ -1,3 +1,5 @@
+//go:build darwin
+
 package macosnetwork
 
 import (
@@ -8,12 +10,6 @@ import (
 
 	"open-mihomo-gateway/internal/config"
 )
-
-type RouteSelection struct {
-	Interface string `json:"interface"`
-	Gateway   string `json:"gateway,omitempty"`
-	Prefix    string `json:"prefix,omitempty"`
-}
 
 func LookupRoute(ctx context.Context, destination string) (RouteSelection, error) {
 	args := []string{"-n", "get"}

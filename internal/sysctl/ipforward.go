@@ -8,8 +8,6 @@ import (
 	"open-mihomo-gateway/internal/process"
 )
 
-const keyIPForwarding = "net.inet.ip.forwarding"
-
 type Manager struct{}
 
 func New() Manager {
@@ -32,7 +30,7 @@ func (m Manager) Current() (string, error) {
 }
 
 func (m Manager) Enable() error {
-	return setIPForwarding("1")
+	return m.setIfNeeded("1")
 }
 
 func (m Manager) Restore(previous string) error {
@@ -40,7 +38,17 @@ func (m Manager) Restore(previous string) error {
 	if previous == "" {
 		return nil
 	}
-	return setIPForwarding(previous)
+	return m.setIfNeeded(previous)
+}
+
+// setIfNeeded only writes when the current value differs. Container /proc/sys
+// is often read-only; if the host already has the desired value, skip the write.
+func (m Manager) setIfNeeded(value string) error {
+	current, err := m.Current()
+	if err == nil && strings.TrimSpace(current) == value {
+		return nil
+	}
+	return setIPForwarding(value)
 }
 
 func setIPForwarding(value string) error {

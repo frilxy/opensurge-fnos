@@ -19,6 +19,10 @@ func StartDetached(name string, args ...string) (int, error) {
 }
 
 func StartDetachedWithLog(logPath string, name string, args ...string) (int, error) {
+	return StartDetachedWithLogEnv(logPath, nil, name, args...)
+}
+
+func StartDetachedWithLogEnv(logPath string, extraEnv []string, name string, args ...string) (int, error) {
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return 0, err
@@ -26,6 +30,9 @@ func StartDetachedWithLog(logPath string, name string, args ...string) (int, err
 	defer logFile.Close()
 
 	cmd := exec.Command(name, args...)
+	if len(extraEnv) > 0 {
+		cmd.Env = append(os.Environ(), extraEnv...)
+	}
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	return startDetached(cmd)

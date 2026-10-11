@@ -17,9 +17,9 @@ bind-address: "*"
 mode: rule
 log-level: info
 ipv6: {{ .IPv6Enabled }}
-{{ if .TUNEnabled }}
+{{- if and .TUNEnabled (not .TUNAutoDetectInterface) }}
 interface-name: {{ .UpstreamInterface }}
-{{ end }}
+{{- end }}
 
 external-controller: {{ .APIAddr }}
 {{- if .Secret }}
@@ -58,6 +58,9 @@ tun:
   auto-route: {{ .TUNAutoRoute }}
   auto-detect-interface: {{ .TUNAutoDetectInterface }}
   strict-route: {{ .TUNStrictRoute }}
+{{- if .TUNAutoRedirect }}
+  auto-redirect: true
+{{- end }}
   inet6-address:
     - {{ .TUNIPv6Address }}
   dns-hijack:
@@ -115,6 +118,7 @@ type templateData struct {
 	TUNStack               string
 	TUNAutoRoute           bool
 	TUNAutoDetectInterface bool
+	TUNAutoRedirect        bool
 	TUNStrictRoute         bool
 	TUNRouteAddresses      string
 	TUNCustomRoutes        bool
@@ -178,6 +182,7 @@ func newTemplateData(cfg config.Config) (templateData, error) {
 		TUNStack:               transparent.TUNStack,
 		TUNAutoRoute:           transparent.TUNAutoRoute,
 		TUNAutoDetectInterface: transparent.TUNAutoDetectInterface,
+		TUNAutoRedirect:        transparent.TUNAutoRedirect && transparent.TUNEnabled(),
 		TUNStrictRoute:         transparent.TUNStrictRoute,
 		TUNRouteAddresses:      tunRouteAddresses,
 		TUNCustomRoutes:        tunRouteAddresses != "",

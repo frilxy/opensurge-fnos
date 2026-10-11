@@ -63,6 +63,20 @@ function networkNavigationHash(target: NetworkNavigationTarget) {
   return ''
 }
 
+function redirectToEnterOnce(): boolean {
+  if (isDesktop()) return false
+  try {
+    if (window.sessionStorage.getItem('opensurge-enter-attempted') === '1') {
+      return false
+    }
+    window.sessionStorage.setItem('opensurge-enter-attempted', '1')
+    window.location.replace('/enter')
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function App() {
   const [page, setPage] = useState<Page>(currentPage)
   const [dashboardNavigationRequest, setDashboardNavigationRequest] = useState(0)
@@ -104,11 +118,13 @@ export function App() {
         : { ...nextOverview, sleep_prevention: current.sleep_prevention })
       setError('')
       setOverviewConnection('connected')
+      try { window.sessionStorage.removeItem('opensurge-enter-attempted') } catch { /* ignore */ }
       await acceptLanguage(nextOverview.ui_preferences?.language)
     } catch (cause) {
       if (request !== overviewRequest.current) return
       setOverviewConnection('unreachable')
       if (cause instanceof RequestError && cause.status === 401) {
+        if (redirectToEnterOnce()) return
         setAuthenticationRequired(true)
         setError('')
         return
@@ -132,6 +148,7 @@ export function App() {
 
   useEffect(() => {
     const requireAuthentication = () => {
+      if (redirectToEnterOnce()) return
       setAuthenticationRequired(true)
       setError('')
     }
@@ -305,7 +322,7 @@ export function App() {
       </div>
     </aside>
     <main className="workspace">
-      {authenticationRequired ? <section className="session-expired" role="alert"><span aria-hidden="true">!</span><div><h1>{t('Web GUI 与 OpenSurge 的安全连接已过期')}</h1><p>{t('请点击 macOS 菜单栏中的 OpenSurge 图标，然后选择“打开 OpenSurge 面板”。')}</p></div></section> : <>
+      {authenticationRequired ? <section className="session-expired" role="alert"><span aria-hidden="true">!</span><div><h1>{t('Web GUI 与 OpenSurge 的安全连接已过期')}</h1><p>{t('局域网部署请打开 /enter 重新建立会话；桌面版请从菜单栏重新打开面板。')}</p><p><a href="/enter">/enter</a></p></div></section> : <>
         {overview?.recovery.required && needsNetworkRecoveryWarning(overview.recovery.stage) && <RecoveryBanner recovery={overview.recovery.stage} onOpen={() => go('network', 'control')} />}
         {error && <div className="error-banner" role="alert"><span>!</span><p>{error}</p><button onClick={() => void refresh()}>{t('重试')}</button></div>}
         <PageErrorBoundary key={page}>
