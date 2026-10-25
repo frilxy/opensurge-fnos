@@ -3,6 +3,7 @@ package controlapi
 import (
 	"context"
 	"encoding/binary"
+	"log"
 	"math/rand"
 	"net"
 	"strconv"
@@ -137,8 +138,10 @@ func (c *dnsRecoveryController) finishAutomatic(err error) {
 	if err != nil {
 		c.state = dnsRecoveryFailed
 		c.error = err.Error()
+		log.Printf("OpenSurge DNS recovery: gateway reload failed: %v", err)
 		return
 	}
+	log.Printf("OpenSurge DNS recovery: gateway reload finished; waiting for probes to confirm")
 	// Reload returning success is not proof that resolution works again. Stay
 	// in recovery until a fresh probe confirms healthy answers.
 	c.state = dnsRecoveryRecovering
@@ -219,6 +222,7 @@ func (s *Server) evaluateDNSRecovery(ctx context.Context) {
 		return
 	}
 
+	log.Printf("OpenSurge DNS recovery: %s stopped answering; reloading gateway", target)
 	op := newOperation("auto-reload-dns-"+randomToken(8), "reload")
 	if err := s.store.CreateOperation(op); err != nil {
 		s.lifecycleMu.Unlock()
