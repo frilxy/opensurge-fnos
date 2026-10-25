@@ -12,6 +12,16 @@ if [ ! -f "$CONFIG" ]; then
 	exit 1
 fi
 
+# dns.engine 迁移：0.1.1 及更早的配置没有这一项，默认走 dnsmasq 的 DNS 转发。
+# fnOS 版希望 mihomo 直接应答 53（dnsmasq 只做 DHCP），所以在这里补一次。
+# 必须放在容器里做：fpk 的生命周期钩子以应用用户运行，读不到 root 拥有的 config.yaml
+#（2026-10-25 的 0.1.2 升级就因此静默失败）。用户之后显式写下的值不会被覆盖。
+if ! grep -qE '^[[:space:]]*engine:' "$CONFIG" && grep -qE '^dns:[[:space:]]*$' "$CONFIG"; then
+	if sed -i '/^dns:[[:space:]]*$/a\  engine: mihomo' "$CONFIG" 2>/dev/null; then
+		echo "Enabled dns.engine=mihomo in $CONFIG" >&2
+	fi
+fi
+
 # 浏览器实际用的地址。控制面拿它做 Origin 校验，填错的话 GUI 会变成只读
 # （所有 POST 返回 403）。不给就从配置里的 gateway.lan_ip 推——那就是 NAS 的局域网 IP。
 #
