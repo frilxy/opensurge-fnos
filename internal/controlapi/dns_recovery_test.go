@@ -3,6 +3,8 @@ package controlapi
 import (
 	"context"
 	"net"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -144,5 +146,39 @@ func TestDNSHealthApplicable(t *testing.T) {
 	cfg.Gateway.Mode = config.GatewayModeSameLAN
 	if !dnsHealthApplicable(cfg) {
 		t.Fatal("dnsHealthApplicable() = false for the same-LAN bypass topology")
+	}
+}
+
+func TestCollectDNSForensicsWithoutPID(t *testing.T) {
+	out := collectDNSForensics(0, "", "192.168.10.229:53")
+	for _, want := range []string{"# OpenSurge DNS incident", "target: 192.168.10.229:53", "pid: 0", "no dnsmasq pid"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("forensics output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestCollectDNSForensicsWithMissingProcess(t *testing.T) {
+	// PID 0 is handled separately; use a PID that cannot exist.
+	out := collectDNSForensics(1<<30, "", "127.0.0.1:53")
+	if !strings.Contains(out, "unavailable") {
+		t.Fatalf("forensics output for a missing process should record unavailable entries:\n%s", out)
+	}
+}
+
+func TestTailFile(t *testing.T) {
+	path := t.TempDir() + "/dnsmasq.log"
+	if err := os.WriteFile(path, []byte("first\nsecond\nthird\n"), 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	tail := tailFile(path, 7)
+	if !strings.Contains(tail, "third") {
+		t.Fatalf("tailFile() = %q, want the final line", tail)
+	}
+	if strings.Contains(tail, "first") {
+		t.Fatalf("tailFile() = %q, want only the tail", tail)
+	}
+	if got := tailFile(path+".missing", 10); !strings.Contains(got, "unavailable") {
+		t.Fatalf("tailFile() on a missing file = %q, want unavailable", got)
 	}
 }

@@ -222,6 +222,7 @@ func (s *Server) evaluateDNSRecovery(ctx context.Context) {
 		return
 	}
 
+	s.captureDNSForensics(cfg, target)
 	log.Printf("OpenSurge DNS recovery: %s stopped answering; reloading gateway", target)
 	op := newOperation("auto-reload-dns-"+randomToken(8), "reload")
 	if err := s.store.CreateOperation(op); err != nil {
