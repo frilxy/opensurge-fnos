@@ -101,7 +101,7 @@ compose 需监听 `0.0.0.0`，且配置中 `gateway.lan_ip`（或环境变量
 - **局域网可信**：`/enter` 允许访问该 Host 的设备进入控制台；**不要端口转发到公网**。
 - `control-token` 在 `state/store/control-token`（0600），用于运维 bootstrap API。
 - 更严：只绑 `127.0.0.1` + SSH 隧道。
-- **桌面入口**：`ui/config` 使用 `type: url`（浏览器打开，不做飞牛内嵌面板）。
+- **桌面入口**：`ui/config` 使用 `type: iframe`，在飞牛桌面里内嵌打开（控制面用 CSP `frame-ancestors` 放行 NAS 主机，不再发 `X-Frame-Options: DENY`）。
 - **FN Connect 域名（固定格式）**：`https://opensurge.<FNID>.fnos.net/`  
   控制面自动放行 Host `opensurge.<FNID>.fnos.net`，无需手写白名单。  
 - **其它自定义域名 / 反代**：设置 `OPENSURGE_BASE_URL`，或
