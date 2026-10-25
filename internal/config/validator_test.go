@@ -672,3 +672,22 @@ func TestValidateRuntimeDoesNotLoadTailscaleDevicePolicy(t *testing.T) {
 		t.Fatalf("Validate() must report the missing policy file: %v", err)
 	}
 }
+
+func TestValidateDNSEngine(t *testing.T) {
+	cfg := Default()
+	cfg.DNS.Engine = DNSEngineMihomo
+	if err := Validate(cfg); err != nil {
+		t.Fatalf("Validate() rejected dns.engine=mihomo: %v", err)
+	}
+
+	cfg.DNS.Port = 5353
+	if err := Validate(cfg); err == nil || !strings.Contains(err.Error(), "dns.port must be 53") {
+		t.Fatalf("Validate() error = %v, want the mihomo engine port guard", err)
+	}
+
+	cfg.DNS.Port = 53
+	cfg.DNS.Engine = "bind"
+	if err := Validate(cfg); err == nil || !strings.Contains(err.Error(), "dns.engine must be") {
+		t.Fatalf("Validate() error = %v, want an unknown-engine rejection", err)
+	}
+}

@@ -163,6 +163,8 @@ func applyValue(cfg *Config, section, key, value string) error {
 			return fmt.Errorf("dns.port must be a number")
 		}
 		cfg.DNS.Port = port
+	case "dns.engine":
+		cfg.DNS.Engine = value
 	case "dns.upstream":
 		cfg.DNS.Upstream = value
 	case "dns.ipv6":

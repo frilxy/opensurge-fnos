@@ -23,7 +23,10 @@ dhcp:
 dns:
   listen: "192.168.1.20"      # ← 改我：和 gateway.lan_ip 一致
   port: 53
-  # 转发给 mihomo 的 DNS，保住 fake-IP 和 TUN 的 dns-hijack 语义。别改成公共 DNS。
+  # mihomo 直接监听 0.0.0.0:53 应答 fake-IP，dnsmasq 只保留 DHCP（port=0）。
+  # dnsmasq 的 DNS 是单线程的 C 代码，fnOS 上出现过 TCP 转发卡死后整个解析停摆；
+  # 这一行等于把那条数据路径整体移出故障面。想退回旧行为就改成 dnsmasq。
+  engine: mihomo
   upstream: "127.0.0.1#1053"
 
 mihomo:

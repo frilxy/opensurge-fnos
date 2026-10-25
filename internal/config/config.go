@@ -62,6 +62,22 @@ type DNSConfig struct {
 	Port     int
 	Upstream string
 	IPv6     bool
+	// Engine selects who answers downstream DNS. "dnsmasq" keeps the legacy
+	// forwarder; "mihomo" makes the proxy core answer on 0.0.0.0:53 directly,
+	// which removes dnsmasq's single-threaded DNS data path from the outage
+	// surface entirely. dnsmasq still runs for DHCP when it is enabled.
+	Engine string
+}
+
+const (
+	DNSEngineDNSMasq = "dnsmasq"
+	DNSEngineMihomo  = "mihomo"
+)
+
+// MihomoServesDNS reports whether the proxy core owns the downstream DNS
+// listener instead of dnsmasq.
+func (c DNSConfig) MihomoServesDNS() bool {
+	return c.Engine == DNSEngineMihomo
 }
 
 type MihomoConfig struct {
@@ -239,6 +255,7 @@ func Default() Config {
 			Port:     53,
 			Upstream: MihomoDNSUpstream,
 			IPv6:     false,
+			Engine:   DNSEngineDNSMasq,
 		},
 		Mihomo: MihomoConfig{
 			Binary:      "./bin/mihomo",
