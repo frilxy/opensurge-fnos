@@ -1,0 +1,38 @@
+name: fnOS package
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fpk:
+    name: Build .fpk (x86 + arm)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build app.tgz and both fpk packages
+        run: make fpk
+
+      - name: Show artefacts
+        run: ls -lh packaging/fnos/*.fpk
+
+      - name: Upload workflow artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: opensurge-fpk
+          path: packaging/fnos/*.fpk
+          if-no-files-found: error
+
+      - name: Attach packages to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packaging/fnos/*.fpk
+          generate_release_notes: true

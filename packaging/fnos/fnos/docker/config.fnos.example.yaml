@@ -23,7 +23,10 @@ dhcp:
 dns:
   listen: "192.168.1.20"      # ← 改我：和 gateway.lan_ip 一致
   port: 53
-  # 转发给 mihomo 的 DNS，保住 fake-IP 和 TUN 的 dns-hijack 语义。别改成公共 DNS。
+  # mihomo 直接监听 0.0.0.0:53 应答 fake-IP，dnsmasq 只保留 DHCP（port=0）。
+  # dnsmasq 的 DNS 是单线程的 C 代码，fnOS 上出现过 TCP 转发卡死后整个解析停摆；
+  # 这一行等于把那条数据路径整体移出故障面。想退回旧行为就改成 dnsmasq。
+  engine: mihomo
   upstream: "127.0.0.1#1053"
 
 mihomo:
@@ -49,8 +52,10 @@ transparent:
   tun_stack: "mixed"
   tun_auto_route: true
   # 与 conversun mihomo 一致：自动选出口网卡，本机浏览器/进程才能稳定透明代理。
+  # 固定 false 且写死 interface-name 时，常见 curl 正常、Chromium 异常断开。
   tun_auto_detect_interface: true
-  # 旁路由关键：把「指网关过来的转发流量」拉进 TUN。
+  # 旁路由关键：把「指网关过来的转发流量」拉进 TUN。关掉后手机往往只走内核 NAT，
+  # mihomo connections 里只剩 sourceIP=198.18.0.1，活跃设备列表会空。
   tun_auto_redirect: true
   tun_strict_route: false
 
@@ -59,6 +64,7 @@ local_system_proxy:
   enabled: false
 
 local_system_dns:
+  # macOS TUN 协同系统 DNS；fnOS 不改宿主机 resolver。
   enabled: false
 
 upstream_proxy:
