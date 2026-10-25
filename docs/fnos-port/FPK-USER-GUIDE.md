@@ -149,8 +149,8 @@ docker load -i opensurge-v0.1.1.tar
 http://<NAS-IP>:61767/enter
 ```
 
-端口以向导填写为准。应用中心 / 桌面图标用 **外链**（`type=url`）在浏览器打开
-`/enter`，不使用飞牛内嵌窗口面板。
+端口以向导填写为准。桌面图标用 **内嵌面板**（`ui/config` 的 `type: iframe`）打开
+`/enter`，飞牛桌面里直接显示；需要独立窗口时仍然可以直接访问上面的地址。
 
 ### 5.2 为什么不能只打开根路径？
 
@@ -195,7 +195,7 @@ opensurge.<fnid>.fnos.net
 | --- | --- |
 | 局域网 | `http://<NAS-IP>:61767/enter` |
 | FN Connect | `https://opensurge.<FNID>.fnos.net/` |
-| 应用中心图标 | 浏览器打开上述地址（外链，非内嵌面板） |
+| 应用中心图标 | 在飞牛桌面内嵌面板中打开；需要独立窗口时仍可直接访问上述地址 |
 
 **其它自定义域名 / 反代**（非 `*.fnos.net`）仍可用：
 

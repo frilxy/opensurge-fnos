@@ -518,6 +518,31 @@ func (s *Server) hostAllowed(host string) bool {
 	return false
 }
 
+// frameAncestors lists the origins allowed to embed the panel. Ports are
+// wildcarded because the fnOS UI port (5666/5667 or a reverse proxy) is not
+// known to the control plane, while the host set stays restricted to the
+// configured BaseURL/extra hosts plus the host this request arrived on.
+func (s *Server) frameAncestors(requestHost string) string {
+	ancestors := []string{"'self'"}
+	seen := map[string]struct{}{}
+	add := func(raw string) {
+		host := strings.ToLower(strings.TrimSpace(raw))
+		if host == "" || host == "127.0.0.1" || host == "localhost" || host == "::1" {
+			return
+		}
+		if _, ok := seen[host]; ok {
+			return
+		}
+		seen[host] = struct{}{}
+		ancestors = append(ancestors, "http://"+host+":*", "https://"+host+":*")
+	}
+	for host := range s.allowedHosts {
+		add(host)
+	}
+	add(requestHost)
+	return strings.Join(ancestors, " ")
+}
+
 func (s *Server) lanMode() bool {
 	return len(s.allowedHosts) > 0
 }
@@ -593,9 +618,12 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 			return
 		}
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+		// The fnOS desktop loads this origin inside an iframe served by the NAS
+		// UI on a different port, so 'self' and X-Frame-Options cannot express
+		// the allowed parent. The ancestor list is limited to the configured
+		// hosts (and this request's host) instead of disabling the check.
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors "+s.frameAncestors(host))
 		next.ServeHTTP(w, r)
 	})
 }

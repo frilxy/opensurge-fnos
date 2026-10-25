@@ -220,8 +220,8 @@ func TestLANModeDeniesFraming(t *testing.T) {
 	request.Host = "192.168.1.20:61767"
 	recorder := httptest.NewRecorder()
 	server.Handler().ServeHTTP(recorder, request)
-	if recorder.Header().Get("X-Frame-Options") != "DENY" {
-		t.Fatalf("X-Frame-Options = %q", recorder.Header().Get("X-Frame-Options"))
+	if got := recorder.Header().Get("Content-Security-Policy"); !strings.Contains(got, "frame-ancestors 'self'") || !strings.Contains(got, "http://192.168.1.20:*") {
+		t.Fatalf("Content-Security-Policy = %q, want the NAS host in frame-ancestors", got)
 	}
 }
 
@@ -331,7 +331,7 @@ func TestLoopbackModeDeniesIframeEmbedding(t *testing.T) {
 	request.Host = "127.0.0.1:61767"
 	recorder := httptest.NewRecorder()
 	server.Handler().ServeHTTP(recorder, request)
-	if recorder.Header().Get("X-Frame-Options") != "DENY" {
-		t.Fatalf("X-Frame-Options = %q", recorder.Header().Get("X-Frame-Options"))
+	if got := recorder.Header().Get("Content-Security-Policy"); !strings.Contains(got, "frame-ancestors 'self'") || strings.Contains(got, "http://") {
+		t.Fatalf("Content-Security-Policy = %q, loopback mode must not allow other origins to frame the panel", got)
 	}
 }
