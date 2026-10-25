@@ -24,6 +24,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Set up pnpm
+        run: npm install --global pnpm@11.19.0
+
+      - name: Rebuild the Web GUI from source
+        run: |
+          pnpm --dir web install --frozen-lockfile
+          make web-build
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 

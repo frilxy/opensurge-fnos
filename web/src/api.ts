@@ -159,8 +159,27 @@ class OperationStatusUnknownError extends Error {
 
 // Tracking starts before the mutation is acknowledged. The same observer is
 // shared by the page awaiting completion and the global, navigation-safe card.
+// crypto.randomUUID() only exists in a secure context (HTTPS or localhost).
+// The fnOS desktop serves this panel over plain http://<NAS-IP>:<port>, where
+// randomUUID is undefined and every tracked action (start/stop/reload) throws.
+function randomOperationID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  const bytes = new Uint8Array(16)
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    crypto.getRandomValues(bytes)
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256)
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
 async function trackedRequest<T>(kind: string, path: string, init: RequestInit, asynchronous = false): Promise<T> {
-  const id = crypto.randomUUID()
+  const id = randomOperationID()
   const now = new Date().toISOString()
   recordOperation({ id, kind, state: 'running', phase: 'submitting', created_at: now, updated_at: now, phase_started_at: now })
   const response = request<T>(path, { ...init, headers: { ...init.headers, [asynchronous ? 'Idempotency-Key' : 'X-OpenSurge-Operation-ID']: id } })
