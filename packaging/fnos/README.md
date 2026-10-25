@@ -9,7 +9,7 @@
 
 ## 快速构建
 
-版本号以 `fnos/manifest` 的 `version` 为准（当前 **0.1.5**），与镜像 tag
+版本号以 `fnos/manifest` 的 `version` 为准（当前 **0.1.6**），与镜像 tag
 `v0.1.1` **保持一致**（`scripts/build.sh` 会把 compose 里的 `${VERSION}` 替换成同一数字）。
 
 仓库根目录（推荐）：
@@ -34,8 +34,8 @@ cd packaging/fnos
 
 | 文件 | 说明 |
 | --- | --- |
-| `opensurge_0.1.5_x86.fpk` | Intel / AMD NAS |
-| `opensurge_0.1.5_arm.fpk` | ARM64 NAS |
+| `opensurge_0.1.6_x86.fpk` | Intel / AMD NAS |
+| `opensurge_0.1.6_arm.fpk` | ARM64 NAS |
 | `app.tgz` | 中间产物，被打进 fpk |
 
 镜像（需另推）：`ghcr.io/funchs/opensurge-fnos:v0.1.1`  
