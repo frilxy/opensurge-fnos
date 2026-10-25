@@ -2,7 +2,6 @@ package controlapi
 
 import (
 	"context"
-	"encoding/binary"
 	"net"
 	"testing"
 	"time"
