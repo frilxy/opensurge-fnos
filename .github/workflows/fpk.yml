@@ -17,6 +17,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Drop checked-in packages
+        # 仓库里签入了历史版本的 fpk；只发布本次构建产物。
+        run: rm -f packaging/fnos/*.fpk
+
       - name: Build app.tgz and both fpk packages
         run: make fpk
 
