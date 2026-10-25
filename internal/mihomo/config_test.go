@@ -289,7 +289,7 @@ tun:
 		"allow-lan: true",
 		"bind-address: \"*\"",
 		"external-controller: 127.0.0.1:19090",
-		"listen: 0.0.0.0:1053",
+		`listen: "0.0.0.0:1053"`,
 		"ipv6: false",
 		"enhanced-mode: fake-ip",
 		"fake-ip-range: 198.18.0.1/16",
@@ -1005,13 +1005,26 @@ func assertOrdered(t *testing.T, value string, ordered ...string) {
 }
 
 func TestRenderConfigWithMihomoDNSEngineBindsPort53(t *testing.T) {
+	original := hostHasIPv6
+	t.Cleanup(func() { hostHasIPv6 = original })
+
+	hostHasIPv6 = func() bool { return true }
 	cfg := config.Default()
 	cfg.DNS.Engine = config.DNSEngineMihomo
 	rendered, err := RenderConfig(cfg)
 	if err != nil {
 		t.Fatalf("RenderConfig() error = %v", err)
 	}
-	if !strings.Contains(rendered, "listen: 0.0.0.0:53\n") {
-		t.Fatalf("mihomo config does not serve DNS on port 53:\n%s", rendered)
+	if !strings.Contains(rendered, `listen: "[::]:53"`) {
+		t.Fatalf("mihomo config does not serve dual-stack DNS on port 53:\n%s", rendered)
+	}
+
+	hostHasIPv6 = func() bool { return false }
+	rendered, err = RenderConfig(cfg)
+	if err != nil {
+		t.Fatalf("RenderConfig() error = %v", err)
+	}
+	if !strings.Contains(rendered, `listen: "0.0.0.0:53"`) {
+		t.Fatalf("mihomo config does not fall back to IPv4-only DNS:\n%s", rendered)
 	}
 }

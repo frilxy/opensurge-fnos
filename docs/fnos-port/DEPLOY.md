@@ -126,7 +126,7 @@ entrypoint 给 `opensurge-control` 加上 `--autostart-gateway`（可用
 | 值 | 行为 |
 | --- | --- |
 | `dnsmasq`（旧默认） | dnsmasq 监听 `dns.listen:dns.port`，`server=` 转发到 mihomo `127.0.0.1:1053` |
-| `mihomo` | mihomo 直接监听 `0.0.0.0:53`（fake-IP 不变），dnsmasq `port=0` 只做 DHCP |
+| `mihomo` | mihomo 直接监听 53（fake-IP 不变），dnsmasq `port=0` 只做 DHCP。宿主机有 IPv6 时绑定 `[::]:53`（Linux/Go 双栈，IPv4 客户端照常可用），否则回落到 `0.0.0.0:53` |
 
 fnOS 上建议 `mihomo`：dnsmasq 是单线程 C 程序，实测出现过 DNS-over-TCP 转发卡死后
 整个 53 停摆（Recv-Q 堆积、`CLOSE-WAIT`、CPU 时间不动），而此时代理和 IP 直连都正常。
