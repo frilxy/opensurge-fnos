@@ -399,6 +399,24 @@ apply_network_settings() {
     return 0
 }
 
+
+# dns.engine migration: this edition ships mihomo answering on :53 (dnsmasq keeps
+# only DHCP) because dnsmasq's single-threaded DNS forwarder wedged in TUN
+# deployments. Existing configs predate the switch, so add the key once on
+# install/upgrade; an explicit value written later is never overwritten.
+ensure_dns_engine() {
+    [ -f "${CONFIG_FILE}" ] || return 0
+    if grep -qE '^[[:space:]]*engine:' "${CONFIG_FILE}"; then
+        return 0
+    fi
+    if ! grep -qE '^dns:[[:space:]]*$' "${CONFIG_FILE}"; then
+        return 0
+    fi
+    sed -i '/^dns:[[:space:]]*$/a\  engine: mihomo' "${CONFIG_FILE}" || return 0
+    install_log "Enabled dns.engine=mihomo in ${CONFIG_FILE}"
+    return 0
+}
+
 # Rewrite the whole OPENSURGE_ADDR line so this is idempotent whether the value
 # is still the ${TRIM_SERVICE_PORT} placeholder or an already-patched literal.
 apply_port() {
@@ -550,6 +568,7 @@ force_sync_icons() {
 service_postinst() {
     resolve_network_settings
     seed_config
+    ensure_dns_engine
     apply_port "${wizard_port:-${TRIM_SERVICE_PORT:-}}"
     force_sync_icons
 }
@@ -563,6 +582,7 @@ service_postupgrade() {
     fi
     resolve_network_settings
     seed_config
+    ensure_dns_engine
     if [ -f "${PORT_SAVE}" ]; then
         apply_port "$(cat "${PORT_SAVE}")"
     else
@@ -576,6 +596,7 @@ service_postconfig() {
     apply_port "${wizard_port:-}"
     # Config wizard may change NIC/IP after install; patch an existing config.
     apply_network_settings
+    ensure_dns_engine
 }
 
 # var/ survives uninstall by design; only wipe it when the user asked to.

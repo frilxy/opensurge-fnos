@@ -149,15 +149,27 @@ for PLATFORM in ${PLATFORMS}; do
     )
     rm -rf "${BUILD_DIR}"
 
-    # 校验：包内不得含 AppleDouble，且 ICON 存在
-    if tar tzf "${SCRIPT_DIR}/${FPK_NAME}" | grep -E '(^|/)\._' >/dev/null; then
+    # 校验：包内不得含 AppleDouble，且 ICON 存在。
+    # 先把列表写进临时文件再 grep：grep -q 命中即退出会让 tar 收到 SIGPIPE，
+    # 在 pipefail 下整条管道返回 141，把成功的检查误判成失败。
+    LISTING_FILE="$(mktemp)"
+    tar tzf "${SCRIPT_DIR}/${FPK_NAME}" > "${LISTING_FILE}"
+    if grep -E '(^|/)\._' "${LISTING_FILE}" >/dev/null; then
+        rm -f "${LISTING_FILE}"
         echo "Error: fpk still contains AppleDouble ._* entries" >&2
         exit 1
     fi
-    tar tzf "${SCRIPT_DIR}/${FPK_NAME}" | grep -qx 'ICON.PNG' \
-        || { echo "Error: ICON.PNG missing or wrong path in fpk" >&2; exit 1; }
-    tar tzf "${SCRIPT_DIR}/${FPK_NAME}" | grep -qx 'ICON_256.PNG' \
-        || { echo "Error: ICON_256.PNG missing or wrong path in fpk" >&2; exit 1; }
+    if ! grep -qx 'ICON.PNG' "${LISTING_FILE}"; then
+        rm -f "${LISTING_FILE}"
+        echo "Error: ICON.PNG missing or wrong path in fpk" >&2
+        exit 1
+    fi
+    if ! grep -qx 'ICON_256.PNG' "${LISTING_FILE}"; then
+        rm -f "${LISTING_FILE}"
+        echo "Error: ICON_256.PNG missing or wrong path in fpk" >&2
+        exit 1
+    fi
+    rm -f "${LISTING_FILE}"
 
     echo "✓ Package created: ${FPK_NAME} ($(du -h "${SCRIPT_DIR}/${FPK_NAME}" | cut -f1))"
     BUILT="${BUILT} ${FPK_NAME}"
