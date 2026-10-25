@@ -325,3 +325,34 @@ func TestDNSMasqAcceptsDownstreamIPv6RAConfig(t *testing.T) {
 		t.Fatalf("dnsmasq rejected IPv6 RA config: %v: %s", err, strings.TrimSpace(string(output)))
 	}
 }
+
+func TestRenderConfigWithMihomoDNSEngine(t *testing.T) {
+	cfg := config.Default()
+	cfg.DNS.Engine = config.DNSEngineMihomo
+	cfg.DHCP.Enabled = true
+	cfg.Gateway.Mode = config.GatewayModeSameWiFiDHCP
+	paths := runtime.NewPaths(cfg)
+	rendered, err := RenderConfig(cfg, paths)
+	if err != nil {
+		t.Fatalf("RenderConfig() error = %v", err)
+	}
+
+	for _, want := range []string{
+		"port=0",
+		"dhcp-option=option:router,192.168.50.1",
+		"dhcp-option=option:dns-server,192.168.50.1",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered config missing %q:\n%s", want, rendered)
+		}
+	}
+	for _, unwanted := range []string{
+		"listen-address=",
+		"server=",
+		"option6:dns-server",
+	} {
+		if strings.Contains(rendered, unwanted) {
+			t.Fatalf("rendered config still contains %q with dns.engine=mihomo:\n%s", unwanted, rendered)
+		}
+	}
+}

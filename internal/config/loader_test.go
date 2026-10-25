@@ -255,3 +255,19 @@ transparent:
 		t.Fatal("DHCP.Enabled = false")
 	}
 }
+
+func TestLoadDNSEngine(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	body := "gateway:\n  interface: en0\n  lan_ip: 192.168.50.1\ndns:\n  engine: mihomo\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.DNS.Engine != DNSEngineMihomo {
+		t.Fatalf("DNS.Engine = %q, want %q", cfg.DNS.Engine, DNSEngineMihomo)
+	}
+}

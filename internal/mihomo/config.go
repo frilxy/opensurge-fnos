@@ -41,7 +41,7 @@ geox-url:
 
 dns:
   enable: true
-  listen: 0.0.0.0:1053
+  listen: {{ .DNSListen }}
   ipv6: {{ .DNSIPv6 }}
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
@@ -104,6 +104,10 @@ func RenderConfig(cfg config.Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	data.DNSListen = "0.0.0.0:1053"
+	if cfg.DNS.MihomoServesDNS() {
+		data.DNSListen = "0.0.0.0:53"
+	}
 	var out bytes.Buffer
 	if err := tmpl.Execute(&out, data); err != nil {
 		return "", err
@@ -129,6 +133,7 @@ type templateData struct {
 	LANPrefix              string
 	UpstreamProxy          config.UpstreamProxyConfig
 	DNSIPv6                bool
+	DNSListen              string
 	FakeIPv6Range          string
 	IPv6PacketListenerName string
 	IPv6PacketSocket       string

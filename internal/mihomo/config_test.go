@@ -1003,3 +1003,15 @@ func assertOrdered(t *testing.T, value string, ordered ...string) {
 		position = next
 	}
 }
+
+func TestRenderConfigWithMihomoDNSEngineBindsPort53(t *testing.T) {
+	cfg := config.Default()
+	cfg.DNS.Engine = config.DNSEngineMihomo
+	rendered, err := RenderConfig(cfg)
+	if err != nil {
+		t.Fatalf("RenderConfig() error = %v", err)
+	}
+	if !strings.Contains(rendered, "listen: 0.0.0.0:53\n") {
+		t.Fatalf("mihomo config does not serve DNS on port 53:\n%s", rendered)
+	}
+}

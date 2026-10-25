@@ -27,8 +27,8 @@ domain={{ .Domain }}
 {{ if .IPv6RAEnabled }}
 enable-ra
 dhcp-range={{ .IPv6Prefix }},ra-stateless,64,{{ .LeaseTime }}
-dhcp-option=option6:dns-server,[fe80::]
-ra-param={{ .Interface }},20,60
+{{ if not .MihomoServesDNS }}dhcp-option=option6:dns-server,[fe80::]
+{{ end }}ra-param={{ .Interface }},20,60
 {{ end }}
 
 log-dhcp
@@ -38,6 +38,12 @@ log-queries
 
 pid-file={{ .PIDFile }}
 
+{{ if .MihomoServesDNS }}
+# dns.engine=mihomo: the proxy core answers on 0.0.0.0:53, so this instance
+# keeps only DHCP. Disabling the DNS listener removes dnsmasq's single-threaded
+# forwarding path, which is where the fnOS deployments used to wedge.
+port=0
+{{ else }}
 port={{ .DNSPort }}
 listen-address={{ .DNSListen }}
 {{ if .IPv6GatewayEnabled }}listen-address={{ .IPv6Gateway }}
@@ -45,6 +51,7 @@ listen-address={{ .DNSListen }}
 {{ if .DNSUpstream }}
 no-resolv
 server={{ .DNSUpstream }}
+{{ end }}
 {{ end }}
 `
 
@@ -70,6 +77,7 @@ type templateData struct {
 	IPv6RAEnabled       bool
 	IPv6Gateway         string
 	IPv6Prefix          string
+	MihomoServesDNS     bool
 }
 
 func RenderConfig(cfg config.Config, paths runtime.Paths) (string, error) {
@@ -130,6 +138,7 @@ func RenderConfig(cfg config.Config, paths runtime.Paths) (string, error) {
 		LeaseFile:           leaseFile,
 		PIDFile:             pidFile,
 		DNSPort:             cfg.DNS.Port,
+		MihomoServesDNS:     cfg.DNS.MihomoServesDNS(),
 		DNSListen:           cfg.DNS.Listen,
 		DNSUpstream:         dnsUpstream,
 		Reservations:        reservations,

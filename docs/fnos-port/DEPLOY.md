@@ -119,6 +119,32 @@ entrypoint 给 `opensurge-control` 加上 `--autostart-gateway`（可用
 这不是 fnOS 限制。旧行为是只起控制面，网关 runtime 在 reboot 后变成 interrupted，
 必须在 GUI 先停再开。
 
+### DNS 由谁应答（dns.engine）
+
+`dns.engine` 决定下游 DNS 由谁监听 53：
+
+| 值 | 行为 |
+| --- | --- |
+| `dnsmasq`（旧默认） | dnsmasq 监听 `dns.listen:dns.port`，`server=` 转发到 mihomo `127.0.0.1:1053` |
+| `mihomo` | mihomo 直接监听 `0.0.0.0:53`（fake-IP 不变），dnsmasq `port=0` 只做 DHCP |
+
+fnOS 上建议 `mihomo`：dnsmasq 是单线程 C 程序，实测出现过 DNS-over-TCP 转发卡死后
+整个 53 停摆（Recv-Q 堆积、`CLOSE-WAIT`、CPU 时间不动），而此时代理和 IP 直连都正常。
+把 53 交给 mihomo 等于把这条数据路径整体移出故障面；dnsmasq 即使再出问题也只影响 DHCP。
+
+切换只需在配置文件里加一行（改完在 GUI 里重载或重启网关）：
+
+```yaml
+dns:
+  engine: mihomo
+  listen: "192.168.1.20"   # 仍需和 gateway.lan_ip 一致（用于 DHCP 下发与探测）
+  port: 53
+```
+
+要求 `dns.port: 53`（客户端从 DHCP 拿到的是地址，不带端口）。IPv6 RA 在 `mihomo`
+模式下不再下发 RDNSS，客户端回落到 DHCPv4 的 DNS 选项；需要 IPv6 DNS 的拓扑请留在
+`dnsmasq`。
+
 ## 五、设备侧
 
 在要走代理的设备上手动设置：

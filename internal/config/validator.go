@@ -86,6 +86,17 @@ func validate(cfg Config, checkDevicePolicy bool) error {
 	if !validPort(cfg.DNS.Port) {
 		return fmt.Errorf("dns.port must be between 1 and 65535")
 	}
+	switch cfg.DNS.Engine {
+	case "", DNSEngineDNSMasq:
+	case DNSEngineMihomo:
+		// Clients learn the resolver address from DHCP/static config, which
+		// cannot carry a port; the core therefore has to take the standard one.
+		if cfg.DNS.Port != 53 {
+			return fmt.Errorf("dns.port must be 53 when dns.engine=%s", DNSEngineMihomo)
+		}
+	default:
+		return fmt.Errorf("dns.engine must be %q or %q", DNSEngineDNSMasq, DNSEngineMihomo)
+	}
 	if err := validateDNSUpstream(cfg.DNS.Upstream); err != nil {
 		return err
 	}
