@@ -3,6 +3,7 @@ package mihomo
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -41,7 +42,7 @@ geox-url:
 
 dns:
   enable: true
-  listen: {{ .DNSListen }}
+  listen: "{{ .DNSListen }}"
   ipv6: {{ .DNSIPv6 }}
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
@@ -95,6 +96,49 @@ listeners:
 {{ .PolicySections }}
 `
 
+// hostHasIPv6 reports whether this host has a usable non-loopback IPv6
+// address. It is a variable so tests can pin the choice instead of depending
+// on the runner's network stack.
+var hostHasIPv6 = func() bool {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return false
+	}
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			ipNet, ok := addr.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			if ipNet.IP.To4() == nil && !ipNet.IP.IsLoopback() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// mihomoDNSListen picks the DNS listener address. With the mihomo engine the
+// core owns port 53; when the host has IPv6 it binds the IPv6 wildcard, which
+// Linux/Go serve dual-stack (bindv6only=0), so IPv4 clients keep working while
+// IPv6 clients can resolve through the NAS as well.
+func mihomoDNSListen(cfg config.Config) string {
+	if !cfg.DNS.MihomoServesDNS() {
+		return "0.0.0.0:1053"
+	}
+	if hostHasIPv6() {
+		return "[::]:53"
+	}
+	return "0.0.0.0:53"
+}
+
 func RenderConfig(cfg config.Config) (string, error) {
 	tmpl, err := template.New("mihomo").Parse(configTemplate)
 	if err != nil {
@@ -104,10 +148,7 @@ func RenderConfig(cfg config.Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	data.DNSListen = "0.0.0.0:1053"
-	if cfg.DNS.MihomoServesDNS() {
-		data.DNSListen = "0.0.0.0:53"
-	}
+	data.DNSListen = mihomoDNSListen(cfg)
 	var out bytes.Buffer
 	if err := tmpl.Execute(&out, data); err != nil {
 		return "", err
