@@ -94,6 +94,7 @@ type Server struct {
 	gatewayActivity       gatewayActivity
 	doctor                *doctorController
 	mihomoRecovery        *mihomoRecoveryController
+	dnsRecovery           *dnsRecoveryController
 	sleepPrevention       *sleepPreventionController
 	policyWorkspaceRunner PolicyWorkspaceRunner
 	policyWorkspaceLease  policyWorkspaceLease
@@ -273,6 +274,7 @@ func New(options Options) (*Server, error) {
 		},
 		doctor:           newDoctorController(doctor.Run),
 		mihomoRecovery:   newMihomoRecoveryController(),
+		dnsRecovery:      newDNSRecoveryController(),
 		sleepPrevention:  newSleepPreventionController(options.SleepRunner, configPath),
 		token:            token,
 		baseURL:          baseURL,
@@ -477,6 +479,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		go s.restoreGatewayIfDesired()
 	}
 	go s.monitorMihomoRecovery(ctx)
+	go s.monitorDNSRecovery(ctx)
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
